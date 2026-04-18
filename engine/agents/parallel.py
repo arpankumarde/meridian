@@ -11,7 +11,7 @@ from rich.console import Console
 from ..events import emit_agent_event
 from ..logging_config import get_logger
 from ..models.findings import Evidence, EvidenceReport, VerificationDirective
-from ..storage.database import VeritasDatabase
+from ..storage.database import MeridianDatabase
 from .base import AgentConfig
 from .intern import InternAgent
 
@@ -45,7 +45,7 @@ class ParallelInternPool:
 
     def __init__(
         self,
-        db: VeritasDatabase,
+        db: MeridianDatabase,
         pool_size: int = 3,
         config: AgentConfig | None = None,
         console: Console | None = None,

@@ -7,6 +7,7 @@ except ImportError:
     HAS_NETWORKX = False
 
 from ..logging_config import get_logger
+from .graph import CROSS_CORPUS_PREDICATES
 from .models import KnowledgeGap
 from .store import HybridKnowledgeGraphStore
 
@@ -25,6 +26,119 @@ class ManagerQueryInterface:
 
     def __init__(self, kg_store: HybridKnowledgeGraphStore):
         self.store = kg_store
+
+    async def get_relation_stats(self) -> dict:
+        """Count relations by canonical predicate for the current session.
+
+        Returns a dict mapping predicate → count, restricted to the store's
+        session when set. Used by the Manager's landscape scoring to compute
+        the consensus ratio (supports / (supports + contradicts)).
+        """
+        conn = self.store._connection
+        if conn is None:
+            return {}
+        if self.store.session_id:
+            cursor = await conn.execute(
+                "SELECT predicate, COUNT(*) FROM kg_relations "
+                "WHERE session_id = ? GROUP BY predicate",
+                (self.store.session_id,),
+            )
+        else:
+            cursor = await conn.execute(
+                "SELECT predicate, COUNT(*) FROM kg_relations GROUP BY predicate"
+            )
+        rows = await cursor.fetchall()
+        return {row[0]: row[1] for row in rows if row[0]}
+
+    async def get_cross_corpus_edges(self) -> list[dict]:
+        """Return all cross-corpus relations in the current session.
+
+        A cross-corpus edge is any relation whose predicate is one of the
+        canonical CROSS_CORPUS_PREDICATES (internal_corroborates_external,
+        internal_contradicts_external, external_predates_internal,
+        external_overlaps_with_internal_claim, external_cites_internal,
+        external_white_space_near_internal).
+
+        Each returned dict carries: subject_id, subject_name, predicate,
+        object_id, object_name, confidence, source_id. The Manager uses this
+        to surface cross-corpus highlights in the landscape report.
+        """
+        conn = self.store._connection
+        if conn is None or not CROSS_CORPUS_PREDICATES:
+            return []
+
+        placeholders = ",".join("?" * len(CROSS_CORPUS_PREDICATES))
+        base_sql = f"""
+            SELECT r.subject_id, s.name, r.predicate, r.object_id, o.name,
+                   r.confidence, r.source_id, r.corpus
+            FROM kg_relations r
+            LEFT JOIN kg_entities s ON s.id = r.subject_id
+            LEFT JOIN kg_entities o ON o.id = r.object_id
+            WHERE r.predicate IN ({placeholders})
+        """
+        params: tuple = tuple(CROSS_CORPUS_PREDICATES)
+        if self.store.session_id:
+            base_sql += " AND r.session_id = ?"
+            params = params + (self.store.session_id,)
+
+        cursor = await conn.execute(base_sql, params)
+        rows = await cursor.fetchall()
+        return [
+            {
+                "subject_id": r[0],
+                "subject_name": r[1],
+                "predicate": r[2],
+                "object_id": r[3],
+                "object_name": r[4],
+                "confidence": r[5],
+                "source_id": r[6],
+                "corpus": r[7] or "external",
+            }
+            for r in rows
+        ]
+
+    async def get_internal_external_contradictions(self) -> list[dict]:
+        """Shortcut for the highest-value cross-corpus signal: contradictions
+        between internal work and external literature. Returns the same row
+        shape as get_cross_corpus_edges().
+        """
+        edges = await self.get_cross_corpus_edges()
+        return [e for e in edges if e["predicate"] == "internal_contradicts_external"]
+
+    async def get_cross_corpus_summary(self) -> str:
+        """LLM-friendly plain-text summary of cross-corpus signals.
+
+        Used by the Manager's `_synthesize_report` to embed in the synthesis
+        prompt so the landscape report surfaces cross-corpus highlights.
+        Returns an empty string when no cross-corpus edges exist yet.
+        """
+        edges = await self.get_cross_corpus_edges()
+        if not edges:
+            return ""
+
+        # Bucket by predicate for a compact summary
+        buckets: dict[str, list[str]] = {}
+        for e in edges:
+            line = f"{e['subject_name'] or e['subject_id']} → {e['object_name'] or e['object_id']}"
+            buckets.setdefault(e["predicate"], []).append(line)
+
+        label_map = {
+            "internal_corroborates_external": "Internal corroborates external",
+            "internal_contradicts_external": "Internal contradicts external",
+            "external_predates_internal": "External predates internal (prior-art risk)",
+            "external_overlaps_with_internal_claim": "External overlaps with internal claim",
+            "external_cites_internal": "External cites internal",
+            "external_white_space_near_internal": "White space near internal work",
+        }
+
+        parts = ["## Cross-corpus Signals"]
+        for pred, lines in buckets.items():
+            parts.append(f"### {label_map.get(pred, pred)} ({len(lines)})")
+            for line in lines[:8]:
+                parts.append(f"- {line}")
+            if len(lines) > 8:
+                parts.append(f"- … and {len(lines) - 8} more")
+        return "\n".join(parts)
 
     async def what_do_i_know_about(self, topic: str) -> dict:
         """Get all knowledge related to a topic.

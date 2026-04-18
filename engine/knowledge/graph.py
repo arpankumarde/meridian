@@ -146,9 +146,31 @@ PREDICATE_CANONICAL_MAP: dict[str, str] = {
     # === Synonyms -> mentioned_in ===
     'described_in': 'mentioned_in', 'discussed_in': 'mentioned_in',
     'found_in': 'mentioned_in', 'cited_in': 'mentioned_in',
+    # === Cross-corpus predicates (canonical, no synonyms in v1) ===
+    # These are produced by the cross-corpus relationship engine in Phase 6.1.
+    # An internal R&D entity vs an external paper/patent/standard/filing.
+    'internal_corroborates_external': 'internal_corroborates_external',
+    'internal_contradicts_external': 'internal_contradicts_external',
+    'external_predates_internal': 'external_predates_internal',
+    'external_overlaps_with_internal_claim': 'external_overlaps_with_internal_claim',
+    'external_cites_internal': 'external_cites_internal',
+    'external_white_space_near_internal': 'external_white_space_near_internal',
 }
 
-# Canonical predicate names for inclusion in LLM prompts
+# Set of canonical cross-corpus predicates — used by ManagerQueryInterface
+# to filter cross-corpus edges and by the cross-corpus engine to validate output.
+CROSS_CORPUS_PREDICATES: frozenset[str] = frozenset({
+    'internal_corroborates_external',
+    'internal_contradicts_external',
+    'external_predates_internal',
+    'external_overlaps_with_internal_claim',
+    'external_cites_internal',
+    'external_white_space_near_internal',
+})
+
+# Canonical predicate names for inclusion in LLM prompts.
+# Cross-corpus predicates are deliberately omitted — only the cross-corpus
+# engine should produce them, never the per-evidence relation extractor.
 CANONICAL_PREDICATES_PROMPT = (
     "supports, contradicts, causes, enables, implements, is_a, part_of, "
     "correlates_with, outperforms, similar_to, alternative_to, authored_by, "
@@ -221,6 +243,12 @@ class IncrementalKnowledgeGraph:
         # Processing lock for thread safety
         self._processing_lock = asyncio.Lock()
 
+        # Corpus tag for the evidence currently being extracted. Set at the
+        # entry of every public extraction method (under the lock) and read
+        # by every Entity / Relation construction inside the helper methods.
+        # Default "external" since most evidence comes from web/academic search.
+        self._current_corpus: str = "external"
+
     async def _save_credibility_audit(self, audit_data: dict) -> None:
         """Fire-and-forget save of credibility audit data."""
         if not self.credibility_audit_callback:
@@ -246,6 +274,7 @@ class IncrementalKnowledgeGraph:
         """
         logger.info("KG add_evidence: id=%s, fast_mode=%s", evidence.id, fast_mode)
         async with self._processing_lock:
+            self._current_corpus = getattr(evidence, "corpus", None) or "external"
             result = {
                 'entities': [],
                 'relations': [],
@@ -478,6 +507,7 @@ class IncrementalKnowledgeGraph:
                         entity_type=entity_type,
                         aliases=[],
                         sources=[evidence.id],
+                        corpus=self._current_corpus,
                         properties=props,
                     )
                     resolved = await self._resolve_entity(entity)
@@ -498,6 +528,7 @@ class IncrementalKnowledgeGraph:
                             object_id=object_id,
                             source_id=evidence.id,
                             confidence=confidence,
+                            corpus=self._current_corpus,
                         )
 
                         contradiction = await self._check_contradiction(relation)
@@ -609,6 +640,7 @@ class IncrementalKnowledgeGraph:
                         object_id=object_id,
                         source_id=source_id,
                         confidence=confidence,
+                        corpus=self._current_corpus,
                     )
                     relations.append(relation)
 
@@ -774,6 +806,9 @@ class IncrementalKnowledgeGraph:
                     evidence_idx = 0
                 evidence = evidence_items[evidence_idx]
                 confidence = evidence.credibility_score if evidence.credibility_score else 0.8
+                # Stamp the corpus tag for the helpers below — the batch path
+                # interleaves multiple evidence items so we update per-iteration.
+                self._current_corpus = getattr(evidence, "corpus", None) or "external"
 
                 entities = []
                 for e in item.get('entities', [])[:5]:
@@ -794,6 +829,7 @@ class IncrementalKnowledgeGraph:
                             entity_type=entity_type,
                             aliases=[],
                             sources=[evidence.id],
+                            corpus=self._current_corpus,
                             properties=props,
                         )
                         resolved = await self._resolve_entity(entity)
@@ -815,6 +851,7 @@ class IncrementalKnowledgeGraph:
                                 object_id=object_id,
                                 source_id=evidence.id,
                                 confidence=confidence,
+                                corpus=self._current_corpus,
                             )
 
                             contradiction = await self._check_contradiction(relation)
@@ -935,6 +972,7 @@ Return as JSON array:
                 entity_type=e.get('type', 'CONCEPT').upper(),
                 aliases=e.get('aliases', []),
                 sources=[source_id],
+                corpus=self._current_corpus,
             )
             entities.append(entity)
 
@@ -1081,6 +1119,7 @@ Return as JSON array:
                     object_id=object_id,
                     source_id=source_id,
                     confidence=r.get('confidence', 0.8),
+                    corpus=self._current_corpus,
                 )
                 relations.append(relation)
 
@@ -1181,6 +1220,7 @@ Return as JSON array:
                     object_id=e2.id,
                     source_id=evidence.id,
                     confidence=0.4,
+                    corpus=getattr(evidence, "corpus", None) or self._current_corpus,
                 )
                 co_relations.append(relation)
 

@@ -38,8 +38,8 @@ export default function ReportPreview({ sessionId }: ReportPreviewProps) {
         // Fetch report
         const response = await fetch(`http://localhost:9090/api/sessions/${sessionId}/report`);
         if (!response.ok) {
-          if (response.status === 404) throw new Error("Verdict report not generated yet");
-          throw new Error("Failed to load verdict report");
+          if (response.status === 404) throw new Error("Intelligence report not generated yet");
+          throw new Error("Failed to load intelligence report");
         }
         const data = await response.json();
 
@@ -53,7 +53,7 @@ export default function ReportPreview({ sessionId }: ReportPreviewProps) {
           setEvidence(Array.isArray(evidenceData) ? evidenceData : evidenceData.findings || []);
         }
       } catch (err: unknown) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Unable to load verdict report");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Unable to load intelligence report");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -62,7 +62,7 @@ export default function ReportPreview({ sessionId }: ReportPreviewProps) {
   }, [sessionId]);
 
   const fileName = useMemo(() => {
-    const base = `verdict_report_${sessionId}`;
+    const base = `intelligence_report_${sessionId}`;
     return format === "md" ? `${base}.md` : format === "json" ? `${base}.json` : `${base}.pdf`;
   }, [sessionId, format]);
 
@@ -154,7 +154,7 @@ export default function ReportPreview({ sessionId }: ReportPreviewProps) {
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Verdict Report - ${sessionId}</title>
+<title>Intelligence Report - ${sessionId}</title>
 <style>
 @page { size: A4; margin: 0; }
 * { box-sizing: border-box; }
@@ -268,7 +268,7 @@ ${htmlBody}
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-obs-border">
           <div>
-            <h3 className="text-lg font-display">Verdict Report</h3>
+            <h3 className="text-lg font-display">Intelligence Report</h3>
             <p className="text-xs text-text-muted mt-1">
               {path ? (
                 <>Saved at: <span className="font-mono">{path}</span></>
@@ -310,19 +310,19 @@ ${htmlBody}
         {loading ? (
           <div className="flex items-center gap-3 text-text-secondary">
             <span className="material-symbols-outlined animate-spin">progress_activity</span>
-            <span className="text-sm">Loading verdict report...</span>
+            <span className="text-sm">Loading intelligence report...</span>
           </div>
         ) : error ? (
           <div className="text-center py-12">
             <span className="material-symbols-outlined text-4xl text-text-muted mb-3 block">article</span>
             <p className="text-sm text-rose mb-1">{error}</p>
-            <p className="text-xs text-text-muted">Run a session to completion to generate a verdict report.</p>
+            <p className="text-xs text-text-muted">Run a session to completion to generate an intelligence report.</p>
           </div>
         ) : report.trim().length === 0 ? (
           <div className="text-center py-12">
             <span className="material-symbols-outlined text-4xl text-text-muted mb-3 block">draft</span>
-            <p className="text-sm text-text-secondary">Verdict report is empty.</p>
-            <p className="text-xs text-text-muted mt-1">Try rerunning the fact check or exporting evidence.</p>
+            <p className="text-sm text-text-secondary">Intelligence report is empty.</p>
+            <p className="text-xs text-text-muted mt-1">Try rerunning the audit or exporting evidence.</p>
           </div>
         ) : (
           <div

@@ -1,4 +1,4 @@
-"""Main CLI entry point for Meridian fact-checking engine."""
+"""Main CLI entry point for the Meridian R&D intelligence engine."""
 
 import asyncio
 import signal
@@ -10,7 +10,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 
-from .agents.director import VeritasHarness
+from .agents.director import MeridianHarness
 from .interaction import InputListener, InteractionConfig
 from .logging_config import get_logger, setup_logging
 
@@ -21,11 +21,19 @@ console = Console()
 
 app = typer.Typer(
     name="meridian",
-    help="AI-powered fact-checking system with hierarchical multi-agent verification.",
+    help="R&D intelligence platform with hierarchical multi-agent research.",
     add_completion=False,
 )
 
-_harness: VeritasHarness | None = None
+# `meridian gdrive ...` sub-app for the Google Drive connector.
+gdrive_app = typer.Typer(
+    name="gdrive",
+    help="Manage the Google Drive internal corpus connector.",
+    add_completion=False,
+)
+app.add_typer(gdrive_app, name="gdrive")
+
+_harness: MeridianHarness | None = None
 
 
 def _handle_interrupt(signum, frame):
@@ -45,19 +53,22 @@ def main(
     timeout: int = typer.Option(60, "--timeout", help="Timeout for mid-check questions", min=10, max=300),
     depth: int = typer.Option(5, "--depth", help="Maximum verification depth", min=1, max=10),
 ):
-    """Fact-check a claim using multi-agent AI verification.
+    """Run an R&D intelligence audit on a research brief.
 
-    Meridian decomposes claims into sub-claims, gathers evidence for and against,
-    and produces a verdict: True / Mostly True / Mixed / Mostly False / False / Unverifiable.
+    Meridian decomposes the brief into sub-questions, gathers evidence from web,
+    academic, patent, standards, regulatory, and internal sources, and produces a
+    landscape report with confidence / consensus / source-diversity scores. No
+    TRUE/FALSE verdicts — Meridian surfaces what is corroborated, what is contested,
+    and what white space remains.
 
-    Output is saved to: output/{claim-slug}_{session-id}/
-      - verdict.md        Narrative verdict report
+    Output is saved to: output/{slug}_{session-id}/
+      - report.md         Narrative landscape report
       - evidence.json     Structured evidence data
 
     Examples:
-        meridian "The Great Wall of China is visible from space"
-        meridian "COVID vaccines cause autism" --iterations 10
-        meridian "Earth is 4.5 billion years old" -n 3 --no-clarify
+        meridian "Perovskite tandem solar cell stability, last 24 months"
+        meridian "Find prior art for solid-state lithium-metal anode disclosure"
+        meridian "Is GLP-1 receptor agonist class effective for cardiovascular outcomes?"
     """
     global _harness
 
@@ -84,7 +95,7 @@ def main(
 
     async def run():
         global _harness
-        async with VeritasHarness(db_path, interaction_config=interaction_config, max_depth=depth) as harness:
+        async with MeridianHarness(db_path, interaction_config=interaction_config, max_depth=depth) as harness:
             _harness = harness
 
             listener: InputListener | None = None
@@ -121,8 +132,9 @@ def ui(
     no_browser: bool = typer.Option(False, "--no-browser", help="Don't auto-open browser"),
     restart: bool = typer.Option(True, "--restart/--no-restart", help="Restart servers if ports in use"),
 ):
-    """Launch the Meridian web UI for managing fact checks."""
+    """Launch the Meridian web UI."""
     import os
+    import shutil
     import socket
     import time
     from pathlib import Path
@@ -201,24 +213,50 @@ def ui(
 
     # Start Next.js frontend
     console.print(f"[cyan]Starting frontend on port {ui_port}...[/cyan]")
+    # Repo root = two levels up from engine/main.py. We pin `cwd` so
+    # `meridian ui` works from any directory, and drop `shell=True` so
+    # the argv list is passed straight through to pnpm instead of being
+    # mangled into `sh -c pnpm` (which silently drops the `dev` argument).
+    repo_root = Path(__file__).resolve().parent.parent
+    pnpm_bin = shutil.which("pnpm") or "pnpm"
     try:
-        subprocess.Popen(
-            ["pnpm", "dev"],
+        frontend_proc = subprocess.Popen(
+            [pnpm_bin, "dev"],
+            cwd=str(repo_root),
             start_new_session=True,
             env=os.environ.copy(),
-            shell=True,
         )
+        # Give pnpm up to ~20s to start responding on the dev port.
+        # Also bail early if the child exited — typically a missing
+        # package.json or an uninstalled dependency.
         import urllib.request
+        ready = False
         for i in range(20):
+            if frontend_proc.poll() is not None:
+                console.print(
+                    f"[red]Frontend process exited early (code {frontend_proc.returncode}). "
+                    "Run `pnpm install` in the repo root and try again.[/red]"
+                )
+                sys.exit(1)
             try:
                 urllib.request.urlopen(f"http://localhost:{ui_port}", timeout=1)
                 console.print("[green]Frontend started[/green]")
+                ready = True
                 break
             except Exception:
                 time.sleep(1)
-        else:
-            console.print("[red]Failed to start frontend[/red]")
+        if not ready:
+            console.print(
+                "[red]Failed to start frontend after 20s. "
+                "Run `pnpm install` then `pnpm dev` manually to see the error.[/red]"
+            )
             sys.exit(1)
+    except FileNotFoundError:
+        console.print(
+            "[red]pnpm not found on PATH. Install pnpm (npm install -g pnpm) "
+            "then rerun `meridian ui`.[/red]"
+        )
+        sys.exit(1)
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
@@ -242,6 +280,135 @@ def ui(
     except KeyboardInterrupt:
         console.print("\n[yellow]Stopping...[/yellow]")
         sys.exit(0)
+
+
+# ----------------------------------------------------------------------------
+# `meridian gdrive ...` subcommands
+# ----------------------------------------------------------------------------
+
+
+@gdrive_app.command("auth")
+def gdrive_auth():
+    """Run the one-time Google Drive OAuth flow.
+
+    Opens your browser to the Google consent screen. After you approve,
+    the resulting token is cached under ``~/.meridian/gdrive_token.json``.
+    Requires an OAuth client ID JSON at ``~/.meridian/gdrive_client.json``
+    (download it from Google Cloud Console → OAuth client ID → Desktop app).
+    """
+    from .ingest.gdrive import GDriveAuth
+
+    console.print()
+    console.print(
+        Panel(
+            "[bold]Google Drive OAuth[/bold]\n"
+            "Authorizing Meridian to read your Drive (read-only scope).",
+            border_style="blue",
+        )
+    )
+
+    auth = GDriveAuth()
+    if not auth.has_client_config():
+        console.print(
+            f"[red]Missing OAuth client config at {auth.client_config_path}.[/red]"
+        )
+        console.print(
+            "Download an OAuth client ID (Desktop app) JSON from Google Cloud "
+            "Console and save it to that path, then rerun this command."
+        )
+        sys.exit(1)
+
+    try:
+        auth.run_oauth_flow()
+    except Exception as exc:
+        console.print(f"[red]OAuth flow failed: {exc}[/red]")
+        sys.exit(1)
+
+    console.print(
+        f"[green]Authorized.[/green] Token saved to {auth.token_path}"
+    )
+    console.print(
+        "Next: run [bold]meridian gdrive sync[/bold] to index your Drive."
+    )
+
+
+@gdrive_app.command("sync")
+def gdrive_sync(
+    full: bool = typer.Option(
+        False, "--full", help="Force a full sync (re-indexes everything).",
+    ),
+    max_files: int | None = typer.Option(
+        None, "--max-files", help="Safety cap on files processed this run.",
+    ),
+):
+    """Pull updates from Google Drive and index them into the internal corpus.
+
+    First run is a full sync. Subsequent runs are incremental (delta against
+    the persisted startPageToken). Use ``--full`` to force a fresh walk.
+    """
+    from .ingest.gdrive import GDriveAuth, GDriveIndexer, GDriveSync
+
+    console.print()
+    console.print(
+        Panel(
+            "[bold]Google Drive Sync[/bold]\n"
+            "Indexing your internal corpus into the Meridian vector store.",
+            border_style="blue",
+        )
+    )
+
+    auth = GDriveAuth()
+    if not auth.has_token():
+        console.print(
+            "[red]No Google Drive token. Run `meridian gdrive auth` first.[/red]"
+        )
+        sys.exit(1)
+
+    indexer = GDriveIndexer()
+    sync = GDriveSync(
+        indexer=indexer,
+        auth=auth,
+        progress_callback=lambda msg: console.print(f"[dim]{msg}[/dim]"),
+    )
+
+    try:
+        if full:
+            state = sync.full_sync(max_files=max_files)
+        else:
+            state = sync.incremental_sync()
+    except Exception as exc:
+        console.print(f"[red]Sync failed: {exc}[/red]")
+        sys.exit(1)
+
+    console.print()
+    console.print(
+        f"[green]Done.[/green] Indexed {state.file_count} files total "
+        f"(last sync: {state.last_full_sync_at or 'n/a'})"
+    )
+
+
+@gdrive_app.command("status")
+def gdrive_status():
+    """Show the current Google Drive connector status."""
+    from .ingest.gdrive import GDriveAuth
+    from .ingest.gdrive.sync import SYNC_STATE_PATH
+    from .ingest.gdrive.models import SyncState
+
+    auth = GDriveAuth()
+    state = SyncState.load(SYNC_STATE_PATH)
+
+    console.print()
+    console.print(
+        Panel(
+            f"[bold]Google Drive Connector Status[/bold]\n\n"
+            f"Authenticated: {'[green]yes[/green]' if auth.has_token() else '[red]no[/red]'}\n"
+            f"Token path:    {auth.token_path}\n"
+            f"Files indexed: {state.file_count}\n"
+            f"Last sync:     {state.last_full_sync_at or 'never'}\n"
+            f"Last error:    {state.last_error or 'none'}",
+            border_style="blue",
+        )
+    )
 
 
 def cli():

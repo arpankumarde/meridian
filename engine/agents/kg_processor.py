@@ -81,7 +81,12 @@ class KGProcessor:
             logger.warning("Retrieval indexing error: %s", e, exc_info=True)
 
     def _convert_to_kg_findings(self, evidence_list: list[Evidence]) -> list[KGFinding]:
-        """Convert Evidence models to KGFinding format for the knowledge graph."""
+        """Convert Evidence models to KGFinding format for the knowledge graph.
+
+        Threads the corpus tag (internal vs external) from the source Evidence
+        through to the KGFinding so the knowledge graph can build cross-corpus
+        edges later.
+        """
         kg_findings = []
         for evidence in evidence_list:
             try:
@@ -96,6 +101,7 @@ class KGProcessor:
                     credibility_score=evidence.confidence,
                     finding_type=evidence.evidence_type.value,
                     search_query=evidence.search_query,
+                    corpus=getattr(evidence, "corpus", None) or "external",
                 )
                 kg_findings.append(kg_finding)
             except Exception as e:

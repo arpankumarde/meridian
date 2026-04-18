@@ -526,7 +526,7 @@ async def _download_image(url: str) -> str:
         elif "gif" in content_type:
             ext = ".gif"
 
-        fd, path = tempfile.mkstemp(suffix=ext, prefix="veritas_img_")
+        fd, path = tempfile.mkstemp(suffix=ext, prefix="meridian_img_")
         with os.fdopen(fd, "wb") as f:
             f.write(resp.content)
         return path
@@ -746,7 +746,7 @@ async def detect_ai_image_upload(file: UploadFile = File(...)):
     elif "gif" in content_type:
         ext = ".gif"
 
-    fd, filepath = tempfile.mkstemp(suffix=ext, prefix="veritas_img_")
+    fd, filepath = tempfile.mkstemp(suffix=ext, prefix="meridian_img_")
     try:
         data = await file.read()
         with os.fdopen(fd, "wb") as f:

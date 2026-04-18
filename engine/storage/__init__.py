@@ -1,5 +1,5 @@
-"""Storage layer for fact-check persistence."""
+"""Storage layer for session persistence."""
 
-from .database import VeritasDatabase
+from .database import MeridianDatabase
 
-__all__ = ["VeritasDatabase"]
+__all__ = ["MeridianDatabase"]

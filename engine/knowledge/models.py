@@ -69,6 +69,10 @@ class Entity:
     aliases: list[str] = field(default_factory=list)
     sources: list[str] = field(default_factory=list)
     confidence: float = 1.0
+    # Corpus origin: "external" (papers/patents/standards/regs/web) or
+    # "internal" (Google Drive / internal R&D corpus). Drives cross-corpus
+    # edge detection in the relationship engine.
+    corpus: str = "external"
     properties: dict = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.now)
 
@@ -81,6 +85,7 @@ class Entity:
             'aliases': self.aliases,
             'sources': self.sources,
             'confidence': self.confidence,
+            'corpus': self.corpus,
             'properties': self.properties,
             'created_at': self.created_at.isoformat(),
         }
@@ -95,6 +100,7 @@ class Entity:
             aliases=data.get('aliases', []),
             sources=data.get('sources', []),
             confidence=data.get('confidence', 1.0),
+            corpus=data.get('corpus', 'external'),
             properties=data.get('properties', {}),
             created_at=datetime.fromisoformat(data['created_at']) if 'created_at' in data else datetime.now(),
         )
@@ -110,6 +116,10 @@ class Relation:
     source_id: str
     confidence: float = 1.0
     timestamp: str | None = None
+    # Corpus origin of the source evidence that produced this relation.
+    # Cross-corpus relations (e.g. internal_corroborates_external) carry
+    # the corpus tag of the *evidence* that justified them.
+    corpus: str = "external"
     properties: dict = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.now)
 
@@ -123,6 +133,7 @@ class Relation:
             'source_id': self.source_id,
             'confidence': self.confidence,
             'timestamp': self.timestamp,
+            'corpus': self.corpus,
             'properties': self.properties,
             'created_at': self.created_at.isoformat(),
         }
@@ -138,6 +149,7 @@ class Relation:
             source_id=data['source_id'],
             confidence=data.get('confidence', 1.0),
             timestamp=data.get('timestamp'),
+            corpus=data.get('corpus', 'external'),
             properties=data.get('properties', {}),
             created_at=datetime.fromisoformat(data['created_at']) if 'created_at' in data else datetime.now(),
         )
@@ -154,6 +166,9 @@ class KGEvidence:
     credibility_score: float
     evidence_type: str = "fact"
     search_query: str | None = None
+    # Corpus origin: "internal" if pulled from the internal R&D corpus
+    # (e.g. Google Drive), "external" otherwise.
+    corpus: str = "external"
     finding_type: str | None = None  # Backward-compat alias for evidence_type
 
     def __post_init__(self):
@@ -173,6 +188,7 @@ class KGEvidence:
             'credibility_score': self.credibility_score,
             'evidence_type': self.evidence_type,
             'search_query': self.search_query,
+            'corpus': self.corpus,
         }
 
 

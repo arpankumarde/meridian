@@ -22,13 +22,14 @@ from ..models.findings import (
     Evidence,
     EvidenceReport,
     VerificationDirective,
+    LandscapeReport,
     VerdictReport,
     CheckSession,
     SubClaim,
     is_meta_question,
 )
 from ..retrieval import get_findings_retriever
-from ..storage.database import VeritasDatabase
+from ..storage.database import MeridianDatabase
 from ..verification import (
     BatchVerificationResult,
     VerificationConfig,
@@ -46,22 +47,23 @@ if TYPE_CHECKING:
 
 
 class ManagerAgent(BaseAgent):
-    """The Manager agent coordinates claim verification and critiques evidence.
+    """The Manager agent coordinates a research brief and critiques evidence.
 
     Responsibilities:
-    - Decompose claims into specific sub-claims and verification angles
+    - Decompose research briefs into specific sub-questions and angles
     - Create directives for the Intern agent to gather evidence
-    - Critically evaluate the evidence gathered (for and against)
-    - Identify gaps, inconsistencies, and areas needing deeper investigation
-    - Synthesize evidence into a verdict (True/Mostly True/Mixed/Mostly False/False/Unverifiable)
-    - Track verification progress and depth
+    - Critically evaluate the evidence gathered (corroborating AND contradicting)
+    - Identify gaps, contested areas, and white space in the literature
+    - Synthesize evidence into a landscape report with confidence / consensus /
+      source-diversity scores (no hard verdicts)
+    - Track research progress and depth
 
     Uses Opus model with extended thinking for deep reasoning.
     """
 
     def __init__(
         self,
-        db: VeritasDatabase,
+        db: MeridianDatabase,
         intern: InternAgent,
         config: AgentConfig | None = None,
         console: Console | None = None,
@@ -261,55 +263,56 @@ class ManagerAgent(BaseAgent):
 
     @property
     def system_prompt(self) -> str:
-        return """You are a Claim Verification Manager agent. You coordinate the fact-checking process and determine verdicts.
+        return """You are a Research Brief Manager agent. You coordinate an R&D intelligence research process and produce confidence-scored landscape reports.
 
 RESPONSIBILITIES:
-1. Decompose claims into specific, verifiable sub-claims
+1. Decompose a research brief (a question, hypothesis, topic, or internal document) into specific sub-questions
 2. Create clear directives for the Evidence-Gathering Intern
-3. Critically evaluate evidence gathered (both supporting AND contradicting)
-4. Identify gaps, inconsistencies, and areas needing deeper investigation
-5. Weigh evidence quality, source credibility, and consistency
-6. Determine a verdict based on the totality of evidence
+3. Critically evaluate evidence gathered (both corroborating AND contradicting)
+4. Identify gaps, contested areas, and white space in the literature
+5. Weigh evidence quality, source credibility, and independence
+6. Surface cross-corpus signals — where internal R&D work agrees, disagrees, or overlaps with external literature, patents, standards, or filings
 
-VERIFICATION STRATEGY:
-- Decompose complex claims into atomic, verifiable sub-claims
-- For each sub-claim, seek BOTH supporting and contradicting evidence
-- Prioritize primary sources over secondary reporting
-- Cross-reference multiple independent sources
-- Check for context: is the claim technically true but misleading?
-- Look for the original source of the claim
-- Check if established fact-checkers have already evaluated this claim
+RESEARCH STRATEGY:
+- Decompose complex briefs into focused, independently-investigable sub-questions
+- For each sub-question, seek BOTH corroborating and contradicting evidence
+- Prioritize primary sources (papers, patents, filings, government data) over secondary reporting
+- Cross-reference multiple independent sources — agreement across independent work is a stronger signal than a single authoritative source
+- Pay special attention to internal-vs-external edges: they are the highest-value signal
+- Look for contested areas (high confidence, low consensus) — they are often the most informative findings
 
 EVIDENCE EVALUATION FRAMEWORK:
 When reviewing evidence, consider:
-- Accuracy: Is this evidence from a credible, verifiable source?
-- Relevance: Does this directly address the claim being verified?
+- Accuracy: Is this from a credible, verifiable source?
+- Relevance: Does this directly address the sub-question?
 - Strength: Is this direct evidence or circumstantial?
-- Independence: Are sources independently confirming, or echoing one source?
+- Independence: Are sources independently confirming, or echoing one upstream source?
 - Recency: Is the evidence current and applicable?
-- Contradictions: Are there conflicting pieces of evidence?
+- Corpus: Is this internal (our own work) or external (literature, patents, standards)?
 
-VERDICT SCALE:
-- TRUE: Strong, consistent evidence supports the claim
-- MOSTLY TRUE: Evidence largely supports the claim but with minor caveats
-- MIXED: Significant evidence both for and against; claim is partially true
-- MOSTLY FALSE: Evidence largely contradicts the claim with minor true elements
-- FALSE: Strong, consistent evidence contradicts the claim
-- UNVERIFIABLE: Insufficient evidence to determine truth value
+LANDSCAPE SCORING:
+You DO NOT output TRUE/FALSE verdicts. Instead, the final synthesis produces three 0-1 scores:
+- CONFIDENCE: how strong is the evidence base overall (weighted by credibility)
+- CONSENSUS: how much do the sources agree with each other (corroboration vs contradiction ratio in the KG)
+- SOURCE DIVERSITY: how spread are the sources (a single authoritative source is weaker than five independent ones)
+
+A finding with high confidence and low consensus is a CONTESTED AREA — surface it explicitly, do not flatten it into a verdict.
+A region the literature has not covered near an internal claim is WHITE SPACE — also surface it.
 
 QUALITY STANDARDS:
 - Reject evidence that is speculation presented as fact
-- Flag contradictions for investigation
+- Flag contradictions — do not resolve them prematurely
 - Prioritize primary sources over secondary
-- Note when confidence is low
+- Note when confidence is low — uncalibrated confidence is acceptable, overclaiming is not
 - Weight verified evidence higher than unverified
 
 OUTPUT FORMAT:
 Provide structured analysis with clear reasoning. When creating directives:
 - Be specific about what evidence to search for
-- Explain why this angle matters for verification
+- Explain why this angle matters for the landscape
 - Set appropriate priority (1-10)
-- Define what would constitute supporting vs contradicting evidence"""
+- Define what would constitute corroborating vs contradicting evidence
+- When a sub-question naturally maps to a specific corpus (patents, standards, regulatory filings, internal docs), include a tool hint in the directive"""
 
     async def think(self, context: dict[str, Any]) -> str:
         """Reason about verification progress and next steps."""
@@ -382,7 +385,7 @@ What should I do next? Consider:
 2. Should I go deeper on any sub-claim?
 3. Are there contradictions that need resolution?
 4. Do I have both supporting AND contradicting evidence?
-5. Is it time to determine a verdict and synthesize the report?
+5. Is it time to synthesize the landscape report?
 
 Think step by step about the best next action."""
 
@@ -652,8 +655,13 @@ Think step by step about the best next action."""
             return "Verification paused by user request"
 
         if action == "synthesize":
-            report: VerdictReport = action_result.get("report")
-            return f"Verdict report synthesized: {len(report.key_evidence)} key evidence items, verdict: {report.verdict}, {len(report.recommended_next_steps)} recommendations"
+            report: LandscapeReport = action_result.get("report")
+            return (
+                f"Landscape report synthesized: {len(report.key_evidence)} key evidence items, "
+                f"confidence={report.confidence:.2f}, consensus={report.consensus:.2f}, "
+                f"diversity={report.source_diversity:.2f}, "
+                f"{len(report.recommended_next_steps)} recommendations"
+            )
 
         if action == "intern_task":
             report: EvidenceReport = action_result.get("report")
@@ -777,10 +785,10 @@ Think step by step about the best next action."""
         return response
 
     def _should_synthesize(self, thought: str) -> bool:
-        """Determine if it's time to synthesize a verdict.
+        """Determine if it's time to synthesize the landscape report.
 
-        For fact-checking, we synthesize aggressively once we have enough
-        evidence — no need to exhaust all iterations like deep research.
+        Synthesize aggressively once we have enough evidence — no need to
+        exhaust all iterations.
         """
         # Never synthesize if we have no evidence
         if not self.all_evidence:
@@ -819,14 +827,15 @@ Think step by step about the best next action."""
         thought_lower = thought.lower()
         synthesis_signals = [
             "time to synthesize",
-            "determine the verdict",
-            "render a verdict",
-            "final verdict",
-            "conclude the verification",
+            "produce the landscape",
+            "render the landscape",
+            "final synthesis",
+            "conclude the research",
             "sufficient evidence",
             "enough evidence",
             "ready to conclude",
-            "wrap up the fact-check",
+            "ready to summarize",
+            "wrap up the research",
         ]
         should_synthesize = any(signal in thought_lower for signal in synthesis_signals)
 
@@ -1076,14 +1085,14 @@ Be constructive but rigorous. Flag any rejected evidence that should be re-inves
             async with self._state_lock:
                 self.topics_queue.append(topic)
 
-    async def _synthesize_report(self) -> VerdictReport:
-        """Synthesize all evidence into a verdict report with verification awareness."""
-        logger.info("Synthesizing verdict report: evidence=%d", len(self.all_evidence))
+    async def _synthesize_report(self) -> LandscapeReport:
+        """Synthesize all evidence into a landscape report with confidence / consensus / diversity scores."""
+        logger.info("Synthesizing landscape report: evidence=%d", len(self.all_evidence))
         time_elapsed = self._get_elapsed_minutes()
 
         self._log("=" * 70, style="bold cyan")
         self._log(
-            f"[VERDICT SYNTHESIS] Starting verdict synthesis with {len(self.all_evidence)} evidence items",
+            f"[LANDSCAPE SYNTHESIS] Starting synthesis with {len(self.all_evidence)} evidence items",
             style="bold cyan",
         )
         self._log("=" * 70, style="bold cyan")
@@ -1119,7 +1128,6 @@ Be constructive but rigorous. Flag any rejected evidence that should be re-inves
         ]
 
         # Priority: verified > flagged > unverified > rejected
-        # Weight by calibrated confidence
         priority_evidence = (
             sorted(verified_evidence, key=lambda e: e.confidence, reverse=True)
             + sorted(flagged_evidence, key=lambda e: e.confidence, reverse=True)
@@ -1129,7 +1137,8 @@ Be constructive but rigorous. Flag any rejected evidence that should be re-inves
 
         evidence_text = "\n".join(
             [
-                f"- [{e.evidence_type.value}] {e.content} (verified: {e.verification_status or 'pending'}, confidence: {e.confidence:.0%})"
+                f"- [{e.evidence_type.value}] ({e.corpus}) {e.content} "
+                f"(verified: {e.verification_status or 'pending'}, confidence: {e.confidence:.0%})"
                 for e in key_evidence
             ]
         )
@@ -1144,42 +1153,59 @@ Verification Summary:
 - Low confidence (rejected): {len(rejected_evidence)} evidence items
 - Unverified: {len(other_evidence)} evidence items
 
-Note: Prioritize verified evidence in your verdict. Flagged evidence may need additional context.
-Rejected evidence ({len(rejected_evidence)}) has low confidence and should not drive primary conclusions.
+Prioritize verified evidence. Rejected evidence has low confidence and should not drive primary findings.
 """
 
-        prompt = f"""Synthesize all evidence into a final verdict for this claim.
+        # Pull KG summary for cross-corpus signals
+        try:
+            kg_summary = await self.kg_query.get_research_summary()
+        except Exception:
+            kg_summary = ""
+        try:
+            cross_corpus_summary = await self.kg_query.get_cross_corpus_summary()
+        except Exception:
+            cross_corpus_summary = ""
+        if cross_corpus_summary:
+            kg_summary = f"{kg_summary}\n\n{cross_corpus_summary}" if kg_summary else cross_corpus_summary
 
-Claim: {self.claim}
+        prompt = f"""Synthesize all evidence into a landscape report for this research brief.
+
+Research brief: {self.claim}
 {verification_context}
-Key Evidence (sorted by verification confidence):
+Key Evidence (sorted by priority, tagged with corpus):
 {evidence_text}
 
-Sub-Claims Investigated: {[t.topic for t in self.completed_topics]}
-Sub-Claims Remaining: {[t.topic for t in self.topics_queue[:5]]}
+Sub-questions investigated: {[t.topic for t in self.completed_topics]}
+Sub-questions remaining: {[t.topic for t in self.topics_queue[:5]]}
 
-Create:
-1. A VERDICT: One of TRUE, MOSTLY_TRUE, MIXED, MOSTLY_FALSE, FALSE, or UNVERIFIABLE
-2. A comprehensive summary (2-3 paragraphs) explaining the verdict
-   - Base conclusions on verified/high-confidence evidence
-   - Note supporting and contradicting evidence
-   - Explain why the verdict was chosen
-3. Quality assessment of the evidence (including verification rates)
-4. Recommended next steps if more investigation is warranted
+Knowledge graph summary:
+{kg_summary or "(not available)"}
 
-Be thorough and balanced. Note where evidence has lower confidence."""
+Produce:
+1. A 2-3 paragraph executive summary describing what the evidence shows, what is contested, and what is missing.
+2. A list of KEY FINDINGS — each one an interpretive statement grounded in specific evidence, not a paraphrase of a single source.
+3. CONTESTED AREAS — topics with conflicting evidence (do NOT resolve them prematurely).
+4. WHITE SPACE — questions the literature has not answered.
+5. CROSS-CORPUS HIGHLIGHTS — where internal and external evidence corroborate, contradict, or overlap.
+6. Quality assessment of the overall evidence base.
+7. Recommended next research directions.
 
-        # Use Opus with extended thinking for the final verdict — this is
-        # the one call where deep reasoning matters most.
+DO NOT output a TRUE/FALSE/MIXED verdict. Do not collapse the landscape into a single label.
+Focus on what the evidence actually says, what it disagrees on, and what it does not cover."""
+
+        # Use Opus with extended thinking — this is the one call where deep
+        # reasoning matters most.
         response = await self.call_claude(prompt, use_thinking=True, model_override="opus")
 
-        # Extract verdict from the response
-        verdict = self._extract_verdict(response)
+        # Compute the three landscape scores (heuristic for v1; see PRD §11.4)
+        confidence, consensus, source_diversity = await self._score_landscape(key_evidence)
 
-        return VerdictReport(
+        return LandscapeReport(
             summary=response,
-            verdict=verdict,
             key_evidence=key_evidence,
+            confidence=confidence,
+            consensus=consensus,
+            source_diversity=source_diversity,
             sub_claims_explored=[t.topic for t in self.completed_topics],
             sub_claims_remaining=[t.topic for t in self.topics_queue],
             quality_assessment="",
@@ -1188,22 +1214,75 @@ Be thorough and balanced. Note where evidence has lower confidence."""
             iterations_completed=self.state.iteration,
         )
 
-    def _extract_verdict(self, response: str) -> str:
-        """Extract verdict from the synthesis response."""
-        response_upper = response.upper()
-        verdicts = [
-            "UNVERIFIABLE",
-            "MOSTLY_TRUE", "MOSTLY TRUE", "MOSTLY-TRUE",
-            "MOSTLY_FALSE", "MOSTLY FALSE", "MOSTLY-FALSE",
-            "MIXED",
-            "FALSE",
-            "TRUE",
-        ]
-        for v in verdicts:
-            if v in response_upper:
-                # Normalize to underscore format
-                return v.replace(" ", "_").replace("-", "_")
-        return "UNVERIFIABLE"
+    async def _score_landscape(
+        self, key_evidence: list[Evidence]
+    ) -> tuple[float, float, float]:
+        """Compute the confidence / consensus / source-diversity triple.
+
+        All three are 0-1 heuristics. PRD §11.4 flags calibration as an open
+        question — v1 accepts uncalibrated scores.
+
+        - confidence: weighted mean of finding confidence (credibility stays
+          inside the raw confidence score since the intern already factors it
+          in on extraction).
+        - consensus: fraction of KG relations marked 'supports' over the total
+          of 'supports' + 'contradicts'. Defaults to 0.5 when the KG is empty.
+        - source_diversity: 1 - Gini coefficient over unique source domains.
+          A single domain gives 0; perfectly spread sources approach 1.
+        """
+        # --- Confidence ---
+        if key_evidence:
+            weights = [max(0.0, min(1.0, float(e.confidence or 0.0))) for e in key_evidence]
+            confidence = sum(weights) / len(weights) if weights else 0.0
+        else:
+            confidence = 0.0
+
+        # --- Consensus ---
+        consensus = 0.5
+        try:
+            stats = await self.kg_query.get_relation_stats()
+            if isinstance(stats, dict):
+                supports = float(stats.get("supports", 0) or 0)
+                contradicts = float(stats.get("contradicts", 0) or 0)
+                total = supports + contradicts
+                if total > 0:
+                    consensus = supports / total
+        except Exception:
+            # Fall back to 0.5 if the KG layer doesn't expose stats yet.
+            pass
+
+        # --- Source diversity (1 - Gini over unique domains) ---
+        from urllib.parse import urlparse
+
+        domain_counts: dict[str, int] = {}
+        for e in self.all_evidence:
+            if not e.source_url:
+                continue
+            try:
+                domain = urlparse(e.source_url).netloc.lower() or "unknown"
+            except Exception:
+                domain = "unknown"
+            domain_counts[domain] = domain_counts.get(domain, 0) + 1
+
+        if not domain_counts:
+            source_diversity = 0.0
+        elif len(domain_counts) == 1:
+            source_diversity = 0.0
+        else:
+            counts = sorted(domain_counts.values())
+            n = len(counts)
+            cum = 0.0
+            total_count = sum(counts)
+            for i, c in enumerate(counts, start=1):
+                cum += c * (2 * i - n - 1)
+            gini = cum / (n * total_count) if total_count else 0.0
+            source_diversity = max(0.0, min(1.0, 1.0 - gini))
+
+        return (
+            round(confidence, 4),
+            round(consensus, 4),
+            round(source_diversity, 4),
+        )
 
     async def _run_parallel_initial_verification(self, claim: str, max_aspects: int = 3) -> None:
         """Run parallel initial evidence gathering to quickly build a broad evidence base.
@@ -1476,8 +1555,8 @@ Be thorough and balanced. Note where evidence has lower confidence."""
         use_parallel_init: bool = True,
         resume: bool = False,
         session: CheckSession | None = None,
-    ) -> VerdictReport:
-        """Run a complete claim verification session.
+    ) -> LandscapeReport:
+        """Run a complete research session and return a landscape report.
 
         Args:
             claim: The claim to verify
@@ -1591,14 +1670,16 @@ Be thorough and balanced. Note where evidence has lower confidence."""
             self._current_phase = "react_loop"
             await self.checkpoint_state(session)
             # Return partial report
-            return VerdictReport(
-                summary="Verification paused. Progress has been saved and can be resumed.",
-                verdict="UNVERIFIABLE",
+            return LandscapeReport(
+                summary="Research paused. Progress has been saved and can be resumed.",
                 key_evidence=self.all_evidence[:20],
+                confidence=0.0,
+                consensus=0.0,
+                source_diversity=0.0,
                 sub_claims_explored=[t.topic for t in self.completed_topics],
                 sub_claims_remaining=[t.topic for t in self.topics_queue],
                 quality_assessment="",
-                recommended_next_steps=["Resume verification to continue"],
+                recommended_next_steps=["Resume research to continue"],
                 time_elapsed_minutes=self._get_elapsed_minutes(),
                 iterations_completed=self.state.iteration,
             )
@@ -1622,7 +1703,7 @@ Be thorough and balanced. Note where evidence has lower confidence."""
         if "last_action" in result and result["last_action"].get("action") == "synthesize":
             return result["last_action"]["report"]
 
-        # Generate final verdict report if not already done
+        # Generate final landscape report if not already done
         return await self._synthesize_report()
 
     async def cleanup(self) -> None:

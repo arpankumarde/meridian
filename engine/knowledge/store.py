@@ -80,6 +80,7 @@ class HybridKnowledgeGraphStore:
                 properties TEXT,
                 embedding BLOB,
                 session_id TEXT,
+                corpus TEXT DEFAULT 'external',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -96,6 +97,7 @@ class HybridKnowledgeGraphStore:
                 confidence REAL DEFAULT 1.0,
                 properties TEXT,
                 session_id TEXT,
+                corpus TEXT DEFAULT 'external',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (subject_id) REFERENCES kg_entities(id),
                 FOREIGN KEY (object_id) REFERENCES kg_entities(id)
@@ -157,6 +159,12 @@ class HybridKnowledgeGraphStore:
         await conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_relation_session ON kg_relations(session_id)"
         )
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_entity_corpus ON kg_entities(corpus)"
+        )
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_relation_corpus ON kg_relations(corpus)"
+        )
 
         await conn.commit()
 
@@ -175,37 +183,38 @@ class HybridKnowledgeGraphStore:
         # Load entities as nodes (filtered by session_id when set)
         if self.session_id is not None:
             cursor = await conn.execute(
-                "SELECT id, name, entity_type, properties FROM kg_entities WHERE session_id = ?",
+                "SELECT id, name, entity_type, properties, corpus FROM kg_entities WHERE session_id = ?",
                 (self.session_id,),
             )
         else:
             cursor = await conn.execute(
-                "SELECT id, name, entity_type, properties FROM kg_entities"
+                "SELECT id, name, entity_type, properties, corpus FROM kg_entities"
             )
         for row in await cursor.fetchall():
-            entity_id, name, entity_type, properties = row
+            entity_id, name, entity_type, properties, corpus = row
             props = json.loads(properties) if properties else {}
             self.graph.add_node(
                 entity_id,
                 name=name,
                 entity_type=entity_type,
+                corpus=corpus or "external",
                 **props
             )
 
         # Load relations as edges (filtered by session_id when set)
         if self.session_id is not None:
             cursor = await conn.execute("""
-                SELECT id, subject_id, predicate, object_id, confidence, properties
+                SELECT id, subject_id, predicate, object_id, confidence, properties, corpus
                 FROM kg_relations
                 WHERE session_id = ?
             """, (self.session_id,))
         else:
             cursor = await conn.execute("""
-                SELECT id, subject_id, predicate, object_id, confidence, properties
+                SELECT id, subject_id, predicate, object_id, confidence, properties, corpus
                 FROM kg_relations
             """)
         for row in await cursor.fetchall():
-            rel_id, subj, pred, obj, conf, properties = row
+            rel_id, subj, pred, obj, conf, properties, corpus = row
             props = json.loads(properties) if properties else {}
             if subj in self.graph and obj in self.graph:
                 self.graph.add_edge(
@@ -213,6 +222,7 @@ class HybridKnowledgeGraphStore:
                     relation_id=rel_id,
                     predicate=pred,
                     confidence=conf,
+                    corpus=corpus or "external",
                     **props
                 )
 
@@ -236,11 +246,11 @@ class HybridKnowledgeGraphStore:
         try:
             await conn.execute("""
                 INSERT OR REPLACE INTO kg_entities
-                (id, name, entity_type, properties, embedding, session_id, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (id, name, entity_type, properties, embedding, session_id, corpus, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 entity.id, entity.name, entity.entity_type, properties,
-                embedding_blob, session_id, datetime.now().isoformat(),
+                embedding_blob, session_id, entity.corpus, datetime.now().isoformat(),
             ))
 
             # Add to NetworkX before committing so we can rollback on failure
@@ -253,6 +263,7 @@ class HybridKnowledgeGraphStore:
                     sources=entity.sources,
                     confidence=entity.confidence,
                     session_id=session_id,
+                    corpus=entity.corpus,
                     **entity.properties
                 )
 
@@ -280,12 +291,12 @@ class HybridKnowledgeGraphStore:
         try:
             await conn.execute("""
                 INSERT INTO kg_relations
-                (id, subject_id, predicate, object_id, source_id, confidence, properties, session_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (id, subject_id, predicate, object_id, source_id, confidence, properties, session_id, corpus)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 relation.id, relation.subject_id, relation.predicate,
                 relation.object_id, relation.source_id, relation.confidence,
-                properties, session_id
+                properties, session_id, relation.corpus,
             ))
 
             # Add to NetworkX before committing so we can rollback on failure
@@ -297,7 +308,8 @@ class HybridKnowledgeGraphStore:
                     predicate=relation.predicate,
                     confidence=relation.confidence,
                     source_id=relation.source_id,
-                    session_id=session_id
+                    session_id=session_id,
+                    corpus=relation.corpus,
                 )
 
             await conn.commit()

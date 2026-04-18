@@ -1,7 +1,7 @@
 """
 Knowledge graph query wrapper for API endpoints.
 
-Reads from the veritas_kg.db SQLite database (synchronous) via asyncio executor.
+Reads from the meridian_kg.db SQLite database (synchronous) via asyncio executor.
 """
 import asyncio
 import json
@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 # Default KG database path (relative to project root)
-_DEFAULT_KG_PATH = Path("veritas_kg.db")
+_DEFAULT_KG_PATH = Path("meridian_kg.db")
 
 
 def _query_sync(db_path: str, sql: str, params: tuple = ()) -> list[dict]:
@@ -190,6 +190,84 @@ class KnowledgeGraphAPI:
             "contradictions": contradictions_row["count"] if contradictions_row else 0,
             "entity_types": entity_types,
         }
+
+    async def get_cross_corpus_edges(self, session_id: str | None = None, limit: int = 500) -> dict:
+        """Return all cross-corpus relations for a session, bucketed by predicate.
+
+        Response shape:
+            {
+                "corroborations": [...],
+                "contradictions": [...],
+                "prior_art": [...],
+                "overlaps": [...],
+                "citations": [...],
+                "white_space": [...],
+            }
+
+        Each bucket is a list of dicts with subject / predicate / object /
+        confidence / corpus fields. The Manager uses the same filter; this
+        route just exposes the per-bucket split to the UI.
+        """
+        if not self._db_exists():
+            return {
+                "corroborations": [],
+                "contradictions": [],
+                "prior_art": [],
+                "overlaps": [],
+                "citations": [],
+                "white_space": [],
+            }
+
+        cross_corpus_predicates = (
+            "internal_corroborates_external",
+            "internal_contradicts_external",
+            "external_predates_internal",
+            "external_overlaps_with_internal_claim",
+            "external_cites_internal",
+            "external_white_space_near_internal",
+        )
+        placeholders = ",".join("?" * len(cross_corpus_predicates))
+        base_sql = f"""
+            SELECT r.id, r.subject_id, r.predicate, r.object_id,
+                   r.confidence, r.source_id, r.corpus,
+                   s.name AS subject_name, s.entity_type AS subject_type,
+                   o.name AS object_name, o.entity_type AS object_type
+            FROM kg_relations r
+            LEFT JOIN kg_entities s ON s.id = r.subject_id
+            LEFT JOIN kg_entities o ON o.id = r.object_id
+            WHERE r.predicate IN ({placeholders})
+        """
+        params: tuple = tuple(cross_corpus_predicates)
+        if session_id:
+            base_sql += " AND (r.session_id = ? OR r.session_id IS NULL OR r.session_id = '')"
+            params = params + (session_id,)
+        base_sql += " ORDER BY r.confidence DESC LIMIT ?"
+        params = params + (limit,)
+
+        rows = await self._run(_query_sync, base_sql, params)
+
+        buckets: dict[str, list[dict]] = {
+            "corroborations": [],
+            "contradictions": [],
+            "prior_art": [],
+            "overlaps": [],
+            "citations": [],
+            "white_space": [],
+        }
+        pred_to_bucket = {
+            "internal_corroborates_external": "corroborations",
+            "internal_contradicts_external": "contradictions",
+            "external_predates_internal": "prior_art",
+            "external_overlaps_with_internal_claim": "overlaps",
+            "external_cites_internal": "citations",
+            "external_white_space_near_internal": "white_space",
+        }
+        for row in rows:
+            bucket_key = pred_to_bucket.get(row.get("predicate"))
+            if not bucket_key:
+                continue
+            buckets[bucket_key].append(row)
+        return buckets
 
     async def get_entity(self, entity_id: str) -> dict | None:
         """Get a single entity by ID with its relations."""

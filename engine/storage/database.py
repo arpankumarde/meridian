@@ -174,8 +174,8 @@ class _ConnectionPool:
         self._initialized = False
 
 
-class VeritasDatabase:
-    """SQLite database manager for fact-check persistence."""
+class MeridianDatabase:
+    """SQLite database manager for session persistence."""
 
     def __init__(self, db_path: str = "meridian.db"):
         self.db_path = Path(db_path)
@@ -252,14 +252,14 @@ class VeritasDatabase:
 
     @staticmethod
     def _row_to_session(row: aiosqlite.Row) -> CheckSession:
+        keys = row.keys()
         return CheckSession(
             id=row["id"],
             claim=row["claim"],
             slug=row["slug"],
-            verdict=row["verdict"] if "verdict" in row.keys() else None,
-            max_iterations=row["max_iterations"] if "max_iterations" in row.keys() else 5,
+            max_iterations=row["max_iterations"] if "max_iterations" in keys else 5,
             time_limit_minutes=(
-                row["time_limit_minutes"] if "time_limit_minutes" in row.keys() else 0
+                row["time_limit_minutes"] if "time_limit_minutes" in keys else 0
             ),
             started_at=datetime.fromisoformat(row["started_at"]),
             ended_at=datetime.fromisoformat(row["ended_at"]) if row["ended_at"] else None,
@@ -267,6 +267,12 @@ class VeritasDatabase:
             total_findings=row["total_findings"],
             total_searches=row["total_searches"],
             depth_reached=row["depth_reached"],
+            confidence=row["confidence"] if "confidence" in keys else None,
+            consensus=row["consensus"] if "consensus" in keys else None,
+            source_diversity=(
+                row["source_diversity"] if "source_diversity" in keys else None
+            ),
+            mode=row["mode"] if "mode" in keys and row["mode"] else "question",
             elapsed_seconds=row["elapsed_seconds"] or 0.0,
             paused_at=(
                 datetime.fromisoformat(row["paused_at"]) if row["paused_at"] else None
@@ -289,6 +295,7 @@ class VeritasDatabase:
 
     @staticmethod
     def _row_to_evidence(row: aiosqlite.Row) -> Evidence:
+        keys = row.keys()
         return Evidence(
             id=row["id"],
             session_id=row["session_id"],
@@ -301,6 +308,7 @@ class VeritasDatabase:
             created_at=datetime.fromisoformat(row["created_at"]),
             validated_by_manager=bool(row["validated_by_manager"]),
             manager_notes=row["manager_notes"],
+            corpus=(row["corpus"] if "corpus" in keys and row["corpus"] else "external"),
             verification_status=row["verification_status"],
             verification_method=row["verification_method"],
             kg_support_score=row["kg_support_score"],
@@ -327,7 +335,6 @@ class VeritasDatabase:
                 id TEXT PRIMARY KEY,
                 claim TEXT NOT NULL,
                 slug TEXT,
-                verdict TEXT,
                 max_iterations INTEGER DEFAULT 5,
                 time_limit_minutes INTEGER DEFAULT 0,
                 started_at TEXT NOT NULL,
@@ -336,6 +343,10 @@ class VeritasDatabase:
                 total_findings INTEGER DEFAULT 0,
                 total_searches INTEGER DEFAULT 0,
                 depth_reached INTEGER DEFAULT 0,
+                confidence REAL,
+                consensus REAL,
+                source_diversity REAL,
+                mode TEXT DEFAULT 'question',
                 elapsed_seconds REAL DEFAULT 0.0,
                 paused_at TEXT,
                 iteration_count INTEGER DEFAULT 0,
@@ -369,6 +380,7 @@ class VeritasDatabase:
                 created_at TEXT NOT NULL,
                 validated_by_manager INTEGER DEFAULT 0,
                 manager_notes TEXT,
+                corpus TEXT DEFAULT 'external',
                 verification_status TEXT,
                 verification_method TEXT,
                 kg_support_score REAL DEFAULT 0.0,
@@ -524,18 +536,22 @@ class VeritasDatabase:
         await self._write(
             """
             UPDATE sessions SET
-                status = ?, verdict = ?, ended_at = ?, total_findings = ?, total_searches = ?,
-                depth_reached = ?, elapsed_seconds = ?, paused_at = ?,
+                status = ?, ended_at = ?, total_findings = ?, total_searches = ?,
+                depth_reached = ?, confidence = ?, consensus = ?, source_diversity = ?,
+                mode = ?, elapsed_seconds = ?, paused_at = ?,
                 iteration_count = ?, phase = ?
             WHERE id = ?
             """,
             (
                 session.status,
-                session.verdict,
                 session.ended_at.isoformat() if session.ended_at else None,
                 session.total_findings,
                 session.total_searches,
                 session.depth_reached,
+                session.confidence,
+                session.consensus,
+                session.source_diversity,
+                session.mode,
                 session.elapsed_seconds,
                 session.paused_at.isoformat() if session.paused_at else None,
                 session.iteration_count,
@@ -612,14 +628,14 @@ class VeritasDatabase:
             """INSERT INTO findings (
                 session_id, topic_id, content, evidence_type, source_url,
                 confidence, search_query, created_at, validated_by_manager, manager_notes,
-                verification_status, verification_method, kg_support_score, original_confidence
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                corpus, verification_status, verification_method, kg_support_score, original_confidence
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 evidence.session_id, topic_id, evidence.content, evidence.evidence_type.value,
                 evidence.source_url, evidence.confidence, evidence.search_query,
                 evidence.created_at.isoformat(), 1 if evidence.validated_by_manager else 0,
-                evidence.manager_notes, evidence.verification_status, evidence.verification_method,
-                evidence.kg_support_score, evidence.original_confidence,
+                evidence.manager_notes, evidence.corpus, evidence.verification_status,
+                evidence.verification_method, evidence.kg_support_score, evidence.original_confidence,
             ),
             op="save_evidence",
         )

@@ -14,9 +14,9 @@ from ..costs.tracker import get_cost_tracker, reset_cost_tracker
 from ..events import emit_synthesis
 from ..interaction import InteractionConfig, UserInteraction
 from ..logging_config import get_logger
-from ..models.evidence import AgentRole, CheckSession, VerdictReport
-from ..reports.writer import VerdictReportWriter
-from ..storage.database import VeritasDatabase
+from ..models.evidence import AgentRole, CheckSession, LandscapeReport, VerdictReport
+from ..reports.writer import IntelligenceReportWriter
+from ..storage.database import MeridianDatabase
 from .base import AgentConfig, BaseAgent
 from .intern import InternAgent
 from .manager import ManagerAgent
@@ -28,16 +28,16 @@ class DirectorAgent(BaseAgent):
     """The Director agent is the top-level interface that the user interacts with.
 
     Responsibilities:
-    - Receive and interpret user claims to fact-check
-    - Translate user claims into clear verification objectives
-    - Manage check sessions (start, pause, resume, stop)
-    - Report progress and verdicts to the user
+    - Receive and interpret user research briefs
+    - Translate briefs into clear research objectives
+    - Manage research sessions (start, pause, resume, stop)
+    - Report progress and landscape findings to the user
     - Handle time limits and session management
     """
 
     def __init__(
         self,
-        db: VeritasDatabase,
+        db: MeridianDatabase,
         config: AgentConfig | None = None,
         console: Console | None = None,
         interaction_config: InteractionConfig | None = None,
@@ -100,27 +100,27 @@ class DirectorAgent(BaseAgent):
 
     @property
     def system_prompt(self) -> str:
-        return """You are the Meridian Fact-Check Director. You interface with the user and oversee the entire claim verification operation.
+        return """You are the Meridian R&D Intelligence Director. You interface with the user and oversee a research audit that connects internal R&D work to the external world (papers, patents, standards, regulatory filings).
 
 RESPONSIBILITIES:
-1. Receive claims from users and clarify ambiguities
-2. Set clear verification objectives and success criteria
-3. Monitor evidence gathering progress and quality
+1. Receive research briefs from users and clarify ambiguities
+2. Set clear research objectives and success criteria
+3. Monitor evidence gathering progress and quality across both internal and external corpora
 4. Provide meaningful updates to the user
-5. Present final verdicts with supporting evidence
+5. Present landscape findings with supporting evidence
 
 COMMUNICATION STYLE:
 - Be professional, neutral, and balanced
-- Present evidence from all sides before stating verdicts
-- Be transparent about confidence levels and limitations
-- Clearly distinguish between verified facts and uncertain claims
+- Present evidence from all sides — corroborating, contradicting, contested
+- Be transparent about confidence, consensus, and source-diversity levels
+- Clearly distinguish between verified findings and uncertain claims
 
-VERDICT PRESENTATION:
-- Lead with the verdict (True/Mostly True/Mixed/Mostly False/False/Unverifiable)
-- Support the verdict with the strongest evidence
-- Acknowledge contradicting evidence
+LANDSCAPE PRESENTATION:
+- Lead with the landscape finding (what the evidence shows, not a TRUE/FALSE label)
+- Surface contested areas explicitly — high confidence + low consensus is a feature, not a bug
+- Highlight cross-corpus signals where internal and external evidence corroborate, contradict, or overlap
 - Note confidence levels and any caveats
-- Suggest areas for further investigation if needed"""
+- Suggest next research directions"""
 
     async def think(self, context: dict[str, Any]) -> str:
         """Not used for Director - it's event-driven from user input."""
@@ -179,7 +179,7 @@ VERDICT PRESENTATION:
             resume: If True, resume a paused or crashed session
 
         Returns:
-            VerdictReport with evidence and verdict
+            LandscapeReport with evidence and confidence/consensus/diversity scores
         """
         # Reset interaction state and cost tracker
         self.interaction.reset()
@@ -239,11 +239,13 @@ VERDICT PRESENTATION:
                 self.console.print("\n[yellow]Verification paused. Progress saved.[/yellow]")
                 return report
 
-            # Update session with verdict
+            # Update session with landscape scores
             self.current_session.status = "completed"
             self.current_session.ended_at = datetime.now()
             self.current_session.total_findings = len(report.key_evidence)
-            self.current_session.verdict = report.verdict or "UNVERIFIABLE"
+            self.current_session.confidence = report.confidence
+            self.current_session.consensus = report.consensus
+            self.current_session.source_diversity = report.source_diversity
             self.current_session.phase = "done"
             await self.db.update_session(self.current_session)
 
@@ -276,7 +278,7 @@ VERDICT PRESENTATION:
             raise
 
         finally:
-            # Only close database if we own it (not injected by caller like VeritasHarness)
+            # Only close database if we own it (not injected by caller like MeridianHarness)
             if self._owns_db and self.db:
                 await self.db.close()
 
@@ -350,24 +352,29 @@ VERDICT PRESENTATION:
         ))
         self.console.print()
 
-    async def _display_report(self, report: VerdictReport) -> None:
-        """Display the final verdict report."""
-        # Verdict display with color coding
-        verdict_colors = {
-            "TRUE": "bold green",
-            "MOSTLY_TRUE": "green",
-            "MIXED": "yellow",
-            "MOSTLY_FALSE": "red",
-            "FALSE": "bold red",
-            "UNVERIFIABLE": "dim",
-        }
-        verdict_color = verdict_colors.get(report.verdict, "white")
+    async def _display_report(self, report: LandscapeReport) -> None:
+        """Display the final landscape report."""
+
+        def _color_for(score: float) -> str:
+            if score >= 0.75:
+                return "bold green"
+            if score >= 0.5:
+                return "green"
+            if score >= 0.3:
+                return "yellow"
+            return "red"
+
+        confidence_color = _color_for(report.confidence)
+        consensus_color = _color_for(report.consensus)
+        diversity_color = _color_for(report.source_diversity)
 
         self.console.print()
         self.console.print(Panel(
-            f"[{verdict_color}]VERDICT: {report.verdict}[/{verdict_color}]\n\n"
+            f"[{confidence_color}]Confidence: {report.confidence:.0%}[/{confidence_color}]   "
+            f"[{consensus_color}]Consensus: {report.consensus:.0%}[/{consensus_color}]   "
+            f"[{diversity_color}]Diversity: {report.source_diversity:.0%}[/{diversity_color}]\n\n"
             f"{report.summary}",
-            title="[bold green]Verification Verdict[/bold green]",
+            title="[bold green]Landscape Finding[/bold green]",
             border_style="green",
         ))
 
@@ -563,7 +570,7 @@ VERDICT PRESENTATION:
                 progress=0
             )
 
-        writer = VerdictReportWriter(model="opus")
+        writer = IntelligenceReportWriter(model="opus")
 
         async def report_progress(message: str, progress: int) -> None:
             if self.session_id:
@@ -613,7 +620,7 @@ VERDICT PRESENTATION:
         return self.pause_verification()
 
 
-class VeritasHarness:
+class MeridianHarness:
     """Main harness for running fact-checking sessions.
 
     This is the primary entry point for running the hierarchical verification system.
@@ -626,7 +633,7 @@ class VeritasHarness:
         max_depth: int = 5,
     ):
         self.db_path = db_path
-        self.db: VeritasDatabase | None = None
+        self.db: MeridianDatabase | None = None
         self.director: DirectorAgent | None = None
         self.console = Console()
         self.interaction_config = interaction_config
@@ -634,7 +641,7 @@ class VeritasHarness:
 
     async def __aenter__(self):
         """Async context manager entry."""
-        self.db = VeritasDatabase(self.db_path)
+        self.db = MeridianDatabase(self.db_path)
         await self.db.connect()
         self.director = DirectorAgent(
             self.db,
@@ -667,7 +674,7 @@ class VeritasHarness:
             resume: If True, resume a paused/crashed session
 
         Returns:
-            VerdictReport with evidence and verdict
+            LandscapeReport with evidence and confidence/consensus/diversity scores
         """
         if not self.director:
             raise RuntimeError("Harness not initialized - use async with")

@@ -12,7 +12,7 @@ from ..logging_config import get_logger
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:
-    from ..storage.database import VeritasDatabase
+    from ..storage.database import MeridianDatabase
 
 
 class DecisionType(Enum):
@@ -58,7 +58,7 @@ class AgentDecisionRecord:
 
 
 class DecisionLogger:
-    def __init__(self, db: "VeritasDatabase", batch_size: int = 10, flush_interval_seconds: float = 1.0):
+    def __init__(self, db: "MeridianDatabase", batch_size: int = 10, flush_interval_seconds: float = 1.0):
         self.db = db
         self.batch_size = batch_size
         self.flush_interval = flush_interval_seconds
@@ -134,14 +134,14 @@ class DecisionLogger:
 _decision_logger: DecisionLogger | None = None
 
 
-def get_decision_logger(db: Optional["VeritasDatabase"] = None) -> DecisionLogger | None:
+def get_decision_logger(db: Optional["MeridianDatabase"] = None) -> DecisionLogger | None:
     global _decision_logger
     if _decision_logger is None and db is not None:
         _decision_logger = DecisionLogger(db)
     return _decision_logger
 
 
-async def init_decision_logger(db: "VeritasDatabase") -> DecisionLogger:
+async def init_decision_logger(db: "MeridianDatabase") -> DecisionLogger:
     global _decision_logger
     if _decision_logger is None:
         _decision_logger = DecisionLogger(db)

@@ -38,9 +38,9 @@ build/
 
 # Meridian runtime data
 /output/
-/veritas_retrieval/
-/veritas_kg.db
-/veritas_memory.db
+/meridian_retrieval/
+/meridian_kg.db
+/meridian_memory.db
 
 # ChromaDB / vector store
 /.evidence_retrieval/

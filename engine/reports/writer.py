@@ -1,4 +1,4 @@
-"""Verdict Report Writer - generates comprehensive fact-check verdict reports."""
+"""Intelligence Report Writer — generates comprehensive R&D landscape reports."""
 
 import asyncio
 import json
@@ -19,9 +19,9 @@ logger = get_logger(__name__)
 
 
 class SectionType(str, Enum):
-    """Types of sections that can appear in a dynamic verdict report."""
+    """Types of sections that can appear in a dynamic intelligence report."""
 
-    VERDICT_SUMMARY = "verdict_summary"  # Overall verdict with confidence
+    FINDING_SUMMARY = "finding_summary"  # Overall finding with confidence / consensus / diversity
     TLDR = "tldr"  # 2-3 sentence summary
     FLASH_NUMBERS = "flash_numbers"  # Key metrics callouts
     STATS_TABLE = "stats_table"  # Tabular comparisons
@@ -51,7 +51,7 @@ MAX_EVIDENCE_CHARS = 15000  # ~4k tokens for evidence context
 
 # --- Section generation configuration ---
 
-_SECTION_SYSTEM_PROMPT = "You are writing a sourced, evidence-based fact-check verdict report."
+_SECTION_SYSTEM_PROMPT = "You are writing a sourced, evidence-based R&D intelligence landscape report."
 
 _CITATION_INSTRUCTIONS = """\
 CITATION INSTRUCTIONS:
@@ -116,59 +116,62 @@ _PRE_FILTERS: dict[str, Callable] = {
 }
 
 _SECTION_CONFIGS: dict[SectionType, _SectionConfig] = {
-    SectionType.VERDICT_SUMMARY: _SectionConfig(
+    SectionType.FINDING_SUMMARY: _SectionConfig(
         prompt_template="""\
-Write a Verdict Summary for this fact-check.
+Write a Finding Summary for this R&D intelligence audit.
 
-CLAIM BEING CHECKED: {claim}
+RESEARCH BRIEF: {claim}
 
 KEY EVIDENCE:
 {evidence}
 
-Write a verdict summary that:
-1. States the verdict clearly (TRUE, FALSE, MOSTLY TRUE, MOSTLY FALSE, MIXED, or UNVERIFIABLE)
-2. Provides a 2-3 sentence justification citing the strongest evidence
-3. Notes the overall confidence level
-4. Highlights any important caveats
+Write a finding summary that:
+1. States what the evidence actually shows (no TRUE/FALSE verdict — describe the landscape)
+2. Provides a 2-3 sentence synthesis citing the strongest evidence
+3. Notes the overall confidence level and where consensus exists vs where sources disagree
+4. Highlights any contested areas or notable gaps in the literature
 
 Format as:
 
-**Verdict: [VERDICT]**
-
-[2-3 sentence justification with citations]
+[2-3 sentence synthesis with inline [N] citations]
 
 **Confidence:** [HIGH/MEDIUM/LOW] based on [brief reason]
+**Consensus:** [HIGH/MEDIUM/LOW] — [note where sources agree or disagree]
 
-Output ONLY the verdict summary content.""",
-        system_suffix=" Deliver a clear, evidence-based verdict.",
+Output ONLY the finding summary content.""",
+        system_suffix=(
+            " Deliver a clear, evidence-based landscape finding. "
+            "Do not output a TRUE/FALSE/MIXED verdict — describe the landscape, "
+            "what is corroborated, what is contested, and what is missing."
+        ),
         use_citations=True,
         use_kg_context=False,
         max_evidence=20,
-        selection_title="Verdict summary overall assessment",
-        selection_description="Overall verdict determination",
+        selection_title="Finding summary overall landscape",
+        selection_description="Overall finding from the evidence landscape",
         pre_filter="meta_questions",
     ),
     SectionType.TLDR: _SectionConfig(
         prompt_template="""\
-Write a TL;DR (Too Long; Didn't Read) summary for this fact-check.
+Write a TL;DR (Too Long; Didn't Read) for this R&D intelligence audit.
 
-CLAIM BEING CHECKED: {claim}
+RESEARCH BRIEF: {claim}
 
 KEY EVIDENCE (focus on these substantive findings):
 {evidence}
 
-Write 2-3 sentences that directly state the verdict and the most important evidence.
-Be specific and definitive — use exact numbers, names, and details from evidence.
-Do NOT say the fact-check is incomplete or a placeholder — summarize what was actually found.
+Write 2-3 sentences that state the most important finding and the strongest evidence.
+Be specific — use exact numbers, names, and details from evidence.
+Do NOT output a TRUE/FALSE/MIXED verdict. Do NOT claim the audit is incomplete — summarize what was actually found.
 
 Format as a blockquote (start each line with >).
 Output ONLY the blockquote, nothing else.""",
-        system_suffix=" Distill evidence into a precise verdict summary.",
+        system_suffix=" Distill evidence into a precise landscape summary.",
         use_citations=False,
         use_kg_context=False,
         max_evidence=15,
         selection_title="TL;DR summary",
-        selection_description="Bottom-line verdict",
+        selection_description="Bottom-line landscape finding",
         pre_filter="meta_questions",
     ),
     SectionType.FLASH_NUMBERS: _SectionConfig(
@@ -289,9 +292,9 @@ Output ONLY the gaps content.""",
     ),
     SectionType.NARRATIVE: _SectionConfig(
         prompt_template="""\
-Write a section of a fact-check verdict report.
+Write a section of an R&D intelligence landscape report.
 
-CLAIM BEING CHECKED: {claim}
+RESEARCH BRIEF: {claim}
 SECTION TITLE: {title}
 SECTION DESCRIPTION: {description}
 
@@ -300,26 +303,26 @@ AVAILABLE EVIDENCE:
 {kg_context}{citations}
 
 Write 4-6 paragraphs that:
-1. Open with the key point for this theme
+1. Open with the key insight for this theme
 2. Develop with supporting details and evidence
-3. Explain significance and implications for the verdict
-4. Connect to the broader claim being checked
+3. Explain significance and implications for the landscape
+4. Connect to the broader research brief
 
 Guidelines:
 - Write flowing prose, not bullet points
-- Name specific sources, organizations, or studies when available
+- Name specific sources, papers, patents, or organizations when available
 - Use exact numbers, dates, and details from evidence
 - If marked [VERIFIED], state with confidence. If [UNVERIFIED], hedge appropriately.
-- Check for contradictions among the provided evidence. When sources disagree, explicitly acknowledge the tension rather than silently choosing one side.
+- When internal and external sources agree, say so. When they disagree, explicitly name the tension — that is the most valuable signal.
 
 Output ONLY the section content, no headers.""",
         max_evidence_chars=12000,
     ),
     SectionType.ANALYSIS: _SectionConfig(
         prompt_template="""\
-Write an analysis section synthesizing fact-check evidence.
+Write an analysis section synthesizing the evidence.
 
-CLAIM BEING CHECKED: {claim}
+RESEARCH BRIEF: {claim}
 SECTION TITLE: {title}
 SECTION DESCRIPTION: {description}
 
@@ -330,41 +333,41 @@ AVAILABLE EVIDENCE:
 Write 3-4 paragraphs that:
 1. Synthesize the most important evidence
 2. Identify patterns, trends, and connections
-3. Address contradictions or debates
-4. Draw conclusions about the claim's veracity
+3. Address contradictions or debates between sources
+4. Note where the research landscape has high confidence vs. contested areas
 
-Name specific sources, organizations, or studies when available.
+Name specific sources, papers, patents, or organizations when available.
 If marked [VERIFIED], state with confidence. If [UNVERIFIED], hedge appropriately.
 Output ONLY the analysis content.""",
     ),
     SectionType.CONCLUSIONS: _SectionConfig(
         prompt_template="""\
-Write the conclusions section of a fact-check verdict report.
+Write the conclusions section of an R&D intelligence landscape report.
 
-CLAIM BEING CHECKED: {claim}
+RESEARCH BRIEF: {claim}
 
 KEY EVIDENCE:
 {evidence}
 {kg_context}{citations}
 
 Write 2-3 paragraphs that:
-1. Restate the verdict with supporting evidence
-2. Summarize the most important evidence for and against
-3. Provide actionable context for understanding the claim
-4. Suggest areas for further investigation if relevant
+1. Summarize the strongest findings and the evidence that supports them
+2. Note contested areas and white space (gaps the literature has not covered)
+3. Provide actionable context for the researcher
+4. Suggest next research directions
 
-Be definitive where evidence is [VERIFIED], hedged where [UNVERIFIED].
+Be definitive where evidence is [VERIFIED], hedged where [UNVERIFIED]. Do NOT output a TRUE/FALSE verdict.
 Output ONLY the conclusions content.""",
         system_suffix=" Every major claim must cite its source using [N].",
-        selection_title="Conclusions verdict recommendations",
-        selection_description="Final verdict and recommendations",
+        selection_title="Conclusions recommendations next steps",
+        selection_description="Final landscape synthesis and recommendations",
     ),
 }
 
 
 @dataclass
 class ReportSection:
-    """A section in the verdict report."""
+    """A section in the intelligence report."""
 
     title: str
     content: str
@@ -375,18 +378,19 @@ class ReportSection:
             self.subsections = []
 
 
-class VerdictReportWriter:
-    """Generates comprehensive fact-check verdict reports.
+class IntelligenceReportWriter:
+    """Generates comprehensive R&D intelligence landscape reports.
 
     Creates multi-page reports with:
-    - Verdict summary prominently featured
-    - Evidence for and against the claim
-    - Sub-claim analysis
-    - Table of contents
+    - Finding summary with confidence / consensus / source-diversity scores
+    - Evidence corroborating and contradicting the brief
+    - Sub-question analysis
+    - Cross-corpus highlights (internal ↔ external)
+    - Contested areas and white space
     - Narrative synthesis sections
     - Analysis and insights
     - Conclusions
-    - APA-style references at end
+    - Inline [N] citations and reference list at end
     """
 
     def __init__(self, model: str = "opus"):
@@ -457,20 +461,20 @@ class VerdictReportWriter:
         progress_callback: Callable[[str, int], Awaitable[None]] | None = None,
         user_sections: list[str] | None = None,
     ) -> str:
-        """Generate a comprehensive fact-check verdict report.
+        """Generate a comprehensive R&D intelligence landscape report.
 
         Args:
-            session: The check session
-            evidence: All evidence from the fact-check
-            sub_claims_explored: Sub-claims that were investigated
-            sub_claims_remaining: Sub-claims that could be investigated with more time
+            session: The research session
+            evidence: All evidence from the research run
+            sub_claims_explored: Sub-questions that were investigated
+            sub_claims_remaining: Sub-questions that could be investigated with more time
             kg_exports: Optional knowledge graph exports (stats, visualization, gaps)
             dynamic: If True, use AI-driven dynamic section planning
             verification_metrics: Optional verification metrics from the pipeline
             user_sections: Optional list of section titles to use instead of AI planning
 
         Returns:
-            Complete markdown verdict report
+            Complete markdown intelligence report
         """
         logger.info("Report generation started: session=%s, evidence=%d", session.id, len(evidence))
         # Use dynamic report generation by default
@@ -491,10 +495,10 @@ class VerdictReportWriter:
         sources = self._extract_sources(evidence)
 
         # Generate report sections using Claude
-        await _emit_progress(progress_callback, "Generating verdict summary...", 10)
-        logger.info("Generating verdict summary...")
-        verdict_summary = await self._generate_verdict_summary(
-            session.claim, session.verdict, evidence, sub_claims_explored
+        await _emit_progress(progress_callback, "Generating finding summary...", 10)
+        logger.info("Generating finding summary...")
+        finding_summary = await self._generate_finding_summary(
+            session.claim, evidence, sub_claims_explored
         )
 
         await _emit_progress(progress_callback, "Generating introduction...", 25)
@@ -511,13 +515,13 @@ class VerdictReportWriter:
 
         await _emit_progress(progress_callback, "Generating conclusions...", 85)
         logger.info("Generating conclusions...")
-        conclusions = await self._generate_conclusions(session.claim, session.verdict, evidence, sub_claims_remaining)
+        conclusions = await self._generate_conclusions(session.claim, evidence, sub_claims_remaining)
 
         # Compile the full report
-        await _emit_progress(progress_callback, "Compiling verdict report...", 95)
+        await _emit_progress(progress_callback, "Compiling intelligence report...", 95)
         report = self._compile_report(
             session=session,
-            verdict_summary=verdict_summary,
+            finding_summary=finding_summary,
             introduction=introduction,
             main_sections=main_sections,
             analysis=analysis,
@@ -528,7 +532,7 @@ class VerdictReportWriter:
             kg_exports=kg_exports,
         )
 
-        await _emit_progress(progress_callback, "Verdict report complete", 100)
+        await _emit_progress(progress_callback, "Intelligence report complete", 100)
         return report
 
     def _organize_evidence(self, evidence: list[Evidence]) -> dict[str, list[Evidence]]:
@@ -721,7 +725,7 @@ class VerdictReportWriter:
         keywords = [w for w in raw_keywords if w not in stop_words and len(w) > 2]
 
         type_affinity: dict[SectionType, set[str]] = {
-            SectionType.VERDICT_SUMMARY: {"fact", "insight", "contradiction"},
+            SectionType.FINDING_SUMMARY: {"fact", "insight", "contradiction"},
             SectionType.ANALYSIS: {"insight", "connection", "contradiction"},
             SectionType.GAPS: {"question", "contradiction"},
             SectionType.CONCLUSIONS: {"insight", "fact", "connection"},
@@ -774,40 +778,41 @@ class VerdictReportWriter:
             return evidence_text
         return evidence_text[:max_chars] + "\n... [truncated for length]"
 
-    async def _generate_verdict_summary(
-        self, claim: str, verdict: str | None, evidence: list[Evidence], sub_claims: list[str]
+    async def _generate_finding_summary(
+        self, claim: str, evidence: list[Evidence], sub_claims: list[str]
     ) -> str:
-        """Generate verdict summary section."""
+        """Generate finding summary section (replaces verdict summary)."""
         top_evidence = sorted(evidence, key=lambda e: e.confidence, reverse=True)[:20]
         evidence_text = "\n".join(
-            [f"- [{e.evidence_type.value}] {e.content[:300]}" for e in top_evidence]
+            [
+                f"- [{e.evidence_type.value}] ({getattr(e, 'corpus', 'external')}) {e.content[:300]}"
+                for e in top_evidence
+            ]
         )
         evidence_text = self._truncate_evidence_text(evidence_text)
 
-        verdict_str = verdict.upper() if verdict else "PENDING"
+        prompt = f"""You are writing the Finding Summary for an R&D intelligence landscape report.
 
-        prompt = f"""You are writing the Verdict Summary for a fact-check report.
+RESEARCH BRIEF: {claim}
 
-CLAIM: {claim}
-DETERMINED VERDICT: {verdict_str}
+SUB-QUESTIONS INVESTIGATED: {", ".join(sub_claims[:10])}
 
-SUB-CLAIMS INVESTIGATED: {", ".join(sub_claims[:10])}
-
-KEY EVIDENCE:
+KEY EVIDENCE (with corpus tags — internal / external):
 {evidence_text}
 
-Write a compelling 3-4 paragraph verdict summary that:
-1. Opens with the clear verdict determination and confidence level
-2. Summarizes the strongest evidence supporting the verdict
-3. Acknowledges any contradicting evidence or caveats
-4. Notes what sub-claims were verified and their outcomes
+Write a compelling 3-4 paragraph finding summary that:
+1. Opens with what the evidence actually shows (no TRUE/FALSE verdict)
+2. Summarizes the strongest findings and the sources behind them
+3. Highlights contested areas where sources disagree
+4. Notes where internal and external evidence corroborate, contradict, or overlap
 
 Write in a professional, authoritative tone. Be specific with facts and figures.
 Do NOT include any citations or references in this section - those go at the end.
-Output ONLY the verdict summary text, no headers."""
+Do NOT output a TRUE/FALSE/MIXED verdict.
+Output ONLY the finding summary text, no headers."""
 
         return await self._call_claude(
-            prompt, "You are an expert fact-checker writing a verdict summary."
+            prompt, "You are an expert R&D analyst writing a landscape finding summary."
         )
 
     async def _generate_introduction(self, claim: str, evidence: list[Evidence]) -> str:
@@ -817,23 +822,23 @@ Output ONLY the verdict summary text, no headers."""
 
         context = "\n".join([f"- {e.content}" for e in facts + insights])
 
-        prompt = f"""You are writing the Introduction section for a fact-check verdict report.
+        prompt = f"""You are writing the Introduction section for an R&D intelligence landscape report.
 
-CLAIM BEING CHECKED: {claim}
+RESEARCH BRIEF: {claim}
 
-CONTEXT FROM FACT-CHECK:
+CONTEXT FROM THE AUDIT:
 {context}
 
 Write a 2-3 paragraph introduction that:
-1. Establishes why this claim matters and its context
+1. Establishes why this research brief matters and its context
 2. Provides necessary background for understanding the evidence
-3. Outlines what the report will cover (methodology briefly, then evidence and verdict)
+3. Outlines what the report will cover (methodology briefly, then evidence and findings)
 
 Write in an engaging, informative style. Set up the reader to understand what follows.
 Do NOT include any citations - those go at the end of the report.
 Output ONLY the introduction text, no headers."""
 
-        return await self._call_claude(prompt, "You are an expert fact-check writer.")
+        return await self._call_claude(prompt, "You are an expert R&D intelligence writer.")
 
     async def _generate_main_sections(
         self, claim: str, evidence: list[Evidence]
@@ -845,7 +850,7 @@ Output ONLY the introduction text, no headers."""
         )
         evidence_summary = self._truncate_evidence_text(evidence_summary, 10000)
 
-        theme_prompt = f"""Analyze this fact-check evidence and identify 4-6 main thematic sections for organizing a comprehensive verdict report.
+        theme_prompt = f"""Analyze this evidence and identify 4-6 main thematic sections for organizing a comprehensive R&D intelligence landscape report.
 
 CLAIM BEING CHECKED: {claim}
 
@@ -858,7 +863,7 @@ Return ONLY a JSON array of section titles, like:
 Choose themes that:
 1. Cover the major aspects of the claim being checked
 2. Group related evidence logically
-3. Tell a coherent story from context to evidence to verdict
+3. Tell a coherent story from context to evidence to landscape findings
 4. Are specific, not generic (e.g., "Statistical Evidence Analysis" not "Evidence")"""
 
         themes_response = await self._call_claude(theme_prompt)
@@ -897,7 +902,7 @@ Choose themes that:
         )
         evidence_text = self._format_evidence_block(selected, 12000)
 
-        prompt = f"""You are writing a section of a fact-check verdict report.
+        prompt = f"""You are writing a section of an R&D intelligence landscape report.
 
 CLAIM BEING CHECKED: {claim}
 SECTION TITLE: {section_title}
@@ -913,7 +918,7 @@ CITATION INSTRUCTIONS:
 Write 4-6 paragraphs for this section that:
 1. Opens with the key point or main evidence for this theme
 2. Develops the narrative with supporting details and evidence
-3. Explains significance and implications for the verdict
+3. Explains significance and implications for the research landscape
 4. Connects to the broader claim being checked
 5. Notes any nuances, debates, or areas of uncertainty
 
@@ -954,7 +959,7 @@ Output ONLY the section content, no headers."""
                 "OPEN QUESTIONS:\n" + "\n".join([f"- {q.content}" for q in questions])
             )
 
-        prompt = f"""You are writing the Analysis and Key Insights section of a fact-check verdict report.
+        prompt = f"""You are writing the Analysis and Key Insights section of an R&D intelligence landscape report.
 
 CLAIM BEING CHECKED: {claim}
 
@@ -975,35 +980,33 @@ Output ONLY the analysis text, no headers."""
         )
 
     async def _generate_conclusions(
-        self, claim: str, verdict: str | None, evidence: list[Evidence], sub_claims_remaining: list[str]
+        self, claim: str, evidence: list[Evidence], sub_claims_remaining: list[str]
     ) -> str:
         """Generate conclusions and recommendations."""
         top_evidence = sorted(evidence, key=lambda e: e.confidence, reverse=True)[:10]
         evidence_summary = "\n".join([f"- {e.content}" for e in top_evidence])
 
-        verdict_str = verdict.upper() if verdict else "PENDING"
+        prompt = f"""You are writing the Conclusions section of an R&D intelligence landscape report.
 
-        prompt = f"""You are writing the Conclusions section of a fact-check verdict report.
-
-CLAIM BEING CHECKED: {claim}
-VERDICT: {verdict_str}
+RESEARCH BRIEF: {claim}
 
 KEY EVIDENCE:
 {evidence_summary}
 
-SUB-CLAIMS FOR FURTHER INVESTIGATION: {", ".join(sub_claims_remaining[:5]) if sub_claims_remaining else "None identified"}
+SUB-QUESTIONS FOR FURTHER INVESTIGATION: {", ".join(sub_claims_remaining[:5]) if sub_claims_remaining else "None identified"}
 
 Write 2-3 paragraphs that:
-1. Restate the verdict and the evidence basis
-2. Summarize the most important takeaways
-3. Provide context for understanding the claim
-4. Suggest areas for further investigation
+1. Summarize the strongest findings and the evidence that supports them
+2. Note contested areas (where sources disagree) and white space (gaps the literature has not covered)
+3. Provide actionable context for the researcher
+4. Suggest next research directions
 
 Be definitive where evidence supports it, and appropriately hedged where uncertainty exists.
+Do NOT output a TRUE/FALSE/MIXED verdict.
 Output ONLY the conclusions text, no headers."""
 
         return await self._call_claude(
-            prompt, "You are an expert fact-checker writing conclusions."
+            prompt, "You are an expert R&D analyst writing landscape conclusions."
         )
 
     def _get_representative_evidence(
@@ -1039,8 +1042,10 @@ Output ONLY the conclusions text, no headers."""
         return selected[:max_total]
 
     _USER_SECTION_TYPE_MAP: dict[str, SectionType] = {
-        "verdict": SectionType.VERDICT_SUMMARY,
-        "verdict summary": SectionType.VERDICT_SUMMARY,
+        "finding": SectionType.FINDING_SUMMARY,
+        "finding summary": SectionType.FINDING_SUMMARY,
+        "landscape": SectionType.FINDING_SUMMARY,
+        "overview": SectionType.FINDING_SUMMARY,
         "tldr": SectionType.TLDR,
         "tl;dr": SectionType.TLDR,
         "tl dr": SectionType.TLDR,
@@ -1104,56 +1109,56 @@ Output ONLY the conclusions text, no headers."""
             t = e.evidence_type.value
             type_counts[t] = type_counts.get(t, 0) + 1
 
-        prompt = f"""Analyze this fact-check evidence and plan the optimal verdict report structure.
+        prompt = f"""Analyze this evidence and plan the optimal R&D intelligence landscape report structure.
 
-CLAIM BEING CHECKED: {claim}
+RESEARCH BRIEF: {claim}
 
 EVIDENCE COUNTS BY TYPE: {json.dumps(type_counts)}
 
-SUB-CLAIMS EXPLORED: {", ".join(sub_claims_explored[:10]) if sub_claims_explored else "Various"}
+SUB-QUESTIONS EXPLORED: {", ".join(sub_claims_explored[:10]) if sub_claims_explored else "Various"}
 
 SAMPLE EVIDENCE:
 {evidence_summary}
 
-Your task: Decide what sections this verdict report needs based on the content. Choose from these section types:
+Your task: Decide what sections this intelligence report needs based on the content. Choose from these section types:
 
-- verdict_summary: The overall verdict with confidence assessment (ALWAYS include first)
-- tldr: A 2-3 sentence bottom-line answer
+- finding_summary: The overall finding with confidence / consensus / diversity (ALWAYS include first)
+- tldr: A 2-3 sentence bottom-line summary
 - flash_numbers: Key metrics/statistics callouts if quantitative data exists
 - stats_table: Tabular comparison if comparing multiple items
 - comparison: Side-by-side analysis if comparing approaches/sources
 - timeline: Chronological progression if temporal data exists
 - narrative: Standard prose section for a specific theme
 - analysis: Deep synthesis of patterns and insights
-- gaps: Open questions and unknowns
-- conclusions: Final takeaways and recommendations (always include near end)
+- gaps: Open questions, contested areas, and white space
+- conclusions: Final takeaways and next research directions (always include near end)
 
 Return a JSON array of sections in the order they should appear. Example format:
 [
-  {{"type": "verdict_summary", "title": "Verdict", "description": "Overall verdict determination and confidence", "priority": 10}},
-  {{"type": "tldr", "title": "TL;DR", "description": "Bottom-line verdict", "priority": 9}},
-  {{"type": "narrative", "title": "Evidence For", "description": "Evidence supporting the claim", "priority": 8}},
-  {{"type": "narrative", "title": "Evidence Against", "description": "Evidence contradicting the claim", "priority": 7}},
-  {{"type": "narrative", "title": "Sub-claim Analysis", "description": "Analysis of individual sub-claims", "priority": 6}},
+  {{"type": "finding_summary", "title": "Key Finding", "description": "Overall landscape finding with confidence, consensus, and diversity scores", "priority": 10}},
+  {{"type": "tldr", "title": "TL;DR", "description": "Bottom-line landscape summary", "priority": 9}},
+  {{"type": "narrative", "title": "Corroborating Evidence", "description": "Evidence agreeing with the dominant finding", "priority": 8}},
+  {{"type": "narrative", "title": "Contested Areas", "description": "Evidence where sources disagree", "priority": 7}},
+  {{"type": "narrative", "title": "Cross-corpus Signals", "description": "Where internal work meets the external literature", "priority": 6}},
   {{"type": "analysis", "title": "Patterns & Insights", "description": "Cross-cutting analysis", "priority": 5}},
-  {{"type": "gaps", "title": "Open Questions", "description": "Evidence gaps and uncertainties", "priority": 4}},
-  {{"type": "conclusions", "title": "Conclusions", "description": "Final verdict summary", "priority": 3}}
+  {{"type": "gaps", "title": "White Space", "description": "Questions the literature has not covered", "priority": 4}},
+  {{"type": "conclusions", "title": "Conclusions", "description": "Recommended next research directions", "priority": 3}}
 ]
 
 Guidelines:
-- ALWAYS start with verdict_summary
-- Include sections for evidence for AND against the claim
+- ALWAYS start with finding_summary
+- Include sections for corroborating AND contested evidence
 - Include flash_numbers ONLY if significant quantitative data exists
 - Include stats_table or comparison ONLY if comparing multiple distinct items
 - Include timeline ONLY if clear temporal progression exists
-- Use 3-5 narrative sections with SPECIFIC titles (not generic like "Overview")
+- Use 3-5 narrative sections with SPECIFIC titles
 - ALWAYS end with conclusions
 - Total sections should be 6-10
 
 Return ONLY the JSON array, no explanation."""
 
         response = await self._call_claude(
-            prompt, "You are an expert fact-checker planning verdict report structure."
+            prompt, "You are an expert R&D analyst planning an intelligence report structure."
         )
 
         planned_sections = []
@@ -1177,12 +1182,12 @@ Return ONLY the JSON array, no explanation."""
         except (json.JSONDecodeError, KeyError):
             logger.warning("Report structure planning failed, using fallback", exc_info=True)
             planned_sections = [
-                PlannedSection(SectionType.VERDICT_SUMMARY, "Verdict", "Overall verdict determination"),
-                PlannedSection(SectionType.TLDR, "TL;DR", "Bottom-line verdict"),
-                PlannedSection(SectionType.NARRATIVE, "Evidence For", "Evidence supporting the claim"),
-                PlannedSection(SectionType.NARRATIVE, "Evidence Against", "Evidence contradicting the claim"),
+                PlannedSection(SectionType.FINDING_SUMMARY, "Key Finding", "Overall landscape finding"),
+                PlannedSection(SectionType.TLDR, "TL;DR", "Bottom-line landscape summary"),
+                PlannedSection(SectionType.NARRATIVE, "Corroborating Evidence", "Evidence agreeing with the dominant finding"),
+                PlannedSection(SectionType.NARRATIVE, "Contested Areas", "Evidence where sources disagree"),
                 PlannedSection(SectionType.ANALYSIS, "Analysis", "Synthesis and insights"),
-                PlannedSection(SectionType.CONCLUSIONS, "Conclusions", "Final verdict"),
+                PlannedSection(SectionType.CONCLUSIONS, "Conclusions", "Recommended next research directions"),
             ]
 
         return planned_sections
@@ -1194,7 +1199,7 @@ Return ONLY the JSON array, no explanation."""
 
         parts: list[str] = []
 
-        if section_type in (SectionType.NARRATIVE, SectionType.ANALYSIS, SectionType.CONCLUSIONS, SectionType.VERDICT_SUMMARY):
+        if section_type in (SectionType.NARRATIVE, SectionType.ANALYSIS, SectionType.CONCLUSIONS, SectionType.FINDING_SUMMARY):
             key_concepts = kg_exports.get("key_concepts", [])
             if key_concepts:
                 concepts_str = ", ".join(f"{c['name']} ({c['type']})" for c in key_concepts[:5])
@@ -1206,7 +1211,7 @@ Return ONLY the JSON array, no explanation."""
             SectionType.NARRATIVE,
             SectionType.CONCLUSIONS,
             SectionType.COMPARISON,
-            SectionType.VERDICT_SUMMARY,
+            SectionType.FINDING_SUMMARY,
         ):
             contradictions = kg_exports.get("contradictions", [])
             if contradictions:
@@ -1362,19 +1367,19 @@ Return ONLY the JSON array, no explanation."""
         progress_callback: Callable[[str, int], Awaitable[None]] | None = None,
         user_sections: list[str] | None = None,
     ) -> str:
-        """Generate a comprehensive verdict report with AI-driven dynamic structure.
+        """Generate a comprehensive intelligence report with AI-driven dynamic structure.
 
         Args:
-            session: The check session
-            evidence: All evidence from the fact-check
-            sub_claims_explored: Sub-claims that were investigated
-            sub_claims_remaining: Sub-claims that could be investigated with more time (unused in dynamic mode)
+            session: The research session
+            evidence: All evidence from the audit
+            sub_claims_explored: Sub-questions that were investigated
+            sub_claims_remaining: Sub-questions that could be investigated with more time (unused in dynamic mode)
             kg_exports: Optional knowledge graph exports
             verification_metrics: Optional verification metrics from the pipeline
             user_sections: Optional list of section titles to use instead of AI planning
 
         Returns:
-            Complete markdown verdict report
+            Complete markdown intelligence report
         """
         del sub_claims_remaining  # Unused in dynamic mode, but kept for API compatibility
         sources = self._extract_sources(evidence)
@@ -1388,12 +1393,12 @@ Return ONLY the JSON array, no explanation."""
                 self._source_index[original_url] = self._source_index[normalized_url]
 
         # Phase 1: Plan the report structure
-        await _emit_progress(progress_callback, "Planning verdict report structure...", 5)
-        logger.info("Planning verdict report structure...")
+        await _emit_progress(progress_callback, "Planning intelligence report structure...", 5)
+        logger.info("Planning intelligence report structure...")
         planned_sections = await self._plan_report_structure(
             session.claim, evidence, sub_claims_explored, user_sections=user_sections
         )
-        await _emit_progress(progress_callback, "Planned verdict report structure", 10)
+        await _emit_progress(progress_callback, "Planned intelligence report structure", 10)
         logger.info("Planned %d sections: %s", len(planned_sections), [s.title for s in planned_sections])
 
         # Phase 2: Generate each section (with pacing to avoid rate limits)
@@ -1422,8 +1427,8 @@ Return ONLY the JSON array, no explanation."""
                 await asyncio.sleep(2)
 
         # Compile the report
-        logger.info("Verdict report generation complete: %d sections", len(planned_sections))
-        await _emit_progress(progress_callback, "Compiling verdict report...", 95)
+        logger.info("Intelligence report generation complete: %d sections", len(planned_sections))
+        await _emit_progress(progress_callback, "Compiling intelligence report...", 95)
         return self._compile_dynamic_report(
             session=session,
             planned_sections=planned_sections,
@@ -1432,6 +1437,20 @@ Return ONLY the JSON array, no explanation."""
             sub_claims_explored=sub_claims_explored,
             kg_exports=kg_exports,
             verification_metrics=verification_metrics,
+        )
+
+    @staticmethod
+    def _scores_badge(session: CheckSession) -> str:
+        """Render the confidence / consensus / diversity header badge."""
+        def _fmt(v: float | None) -> str:
+            if v is None:
+                return "—"
+            return f"{v * 100:.0f}%" if v <= 1.0 else f"{v:.2f}"
+
+        return (
+            f"**Confidence:** {_fmt(session.confidence)} · "
+            f"**Consensus:** {_fmt(session.consensus)} · "
+            f"**Source diversity:** {_fmt(session.source_diversity)}"
         )
 
     def _compile_dynamic_report(
@@ -1444,7 +1463,7 @@ Return ONLY the JSON array, no explanation."""
         kg_exports: dict = None,
         verification_metrics: dict = None,
     ) -> str:
-        """Compile dynamically planned sections into final verdict report."""
+        """Compile dynamically planned sections into the final intelligence report."""
         # Build table of contents
         toc_items = []
         for i, section in enumerate(planned_sections, 1):
@@ -1458,30 +1477,21 @@ Return ONLY the JSON array, no explanation."""
             ]
         )
 
-        # Verdict badge for the header
-        verdict_str = session.verdict.upper() if session.verdict else "UNDETERMINED"
-        verdict_badge = f"**Verdict: {verdict_str}**"
+        # Landscape scores badge for the header
+        scores_badge = self._scores_badge(session)
 
         # Build main content with type-specific formatting
         main_content = ""
         for i, section in enumerate(planned_sections, 1):
             main_content += f"\n## {i}. {section.title}\n\n"
 
-            if section.section_type == SectionType.VERDICT_SUMMARY:
-                # Prominent verdict formatting
-                content = section.content.strip()
-                main_content += f"{content}\n"
-            elif section.section_type == SectionType.TLDR:
+            if section.section_type == SectionType.TLDR:
                 content = section.content.strip()
                 if not content.startswith(">"):
                     content = "> " + content.replace("\n", "\n> ")
                 main_content += f"{content}\n"
-            elif section.section_type == SectionType.FLASH_NUMBERS:
-                main_content += f"{section.content}\n"
-            elif section.section_type in (SectionType.STATS_TABLE, SectionType.COMPARISON):
-                main_content += f"{section.content}\n"
             else:
-                main_content += f"{section.content}\n"
+                main_content += f"{section.content.strip()}\n"
 
             main_content += "\n---\n"
 
@@ -1495,18 +1505,18 @@ Return ONLY the JSON array, no explanation."""
 
         # Stats
         sub_claims_count = len(sub_claims_explored) if sub_claims_explored else len(sources)
-        stats = f"""**Fact-Check Statistics:**
+        stats = f"""**Audit Statistics:**
 - Total Evidence Collected: {len(evidence)}
 - Sources Analyzed: {len(sources)}
-- Sub-claims Investigated: {sub_claims_count}
-- Check Duration: {session.started_at.strftime("%Y-%m-%d %H:%M")} to {session.ended_at.strftime("%Y-%m-%d %H:%M") if session.ended_at else "In Progress"}"""
+- Sub-questions Investigated: {sub_claims_count}
+- Run Duration: {session.started_at.strftime("%Y-%m-%d %H:%M")} to {session.ended_at.strftime("%Y-%m-%d %H:%M") if session.ended_at else "In Progress"}"""
 
         # Compile full report
-        report = f"""# Fact-Check: {session.claim}
+        report = f"""# Meridian Intelligence Audit: {session.claim}
 
-*Verdict Report*
+*Landscape Report*
 
-{verdict_badge}
+{scores_badge}
 
 ---
 
@@ -1529,20 +1539,20 @@ Return ONLY the JSON array, no explanation."""
 
 ---
 
-## Appendix: Fact-Check Methodology
+## Appendix: Audit Methodology
 
-This verdict report was generated using a hierarchical multi-agent fact-checking system:
+This intelligence report was generated using a hierarchical multi-agent R&D research system:
 
-1. **Claim Decomposition**: An AI director agent analyzed the claim and decomposed it into verifiable sub-claims.
-2. **Evidence Gathering**: AI intern agents conducted {len(sources)} web searches, analyzing sources for relevance and credibility.
-3. **Evidence Extraction**: {len(evidence)} discrete pieces of evidence were extracted and categorized by type.
-4. **Report Structure Planning**: AI analyzed evidence to determine optimal report sections (verdict, evidence for/against, analysis, etc.).
-5. **Narrative Synthesis**: Each section was generated according to its type with specialized formatting.
-6. **Fact Verification**: Evidence was verified using Chain-of-Verification (CoVe) to reduce hallucinations.
+1. **Brief Decomposition**: An AI director agent analyzed the research brief and decomposed it into investigable sub-questions.
+2. **Evidence Gathering**: AI intern agents conducted {len(sources)} searches across web, academic, patent, standards, regulatory, and internal sources.
+3. **Evidence Extraction**: {len(evidence)} discrete pieces of evidence were extracted, tagged by corpus (internal / external), and categorized by type.
+4. **Report Structure Planning**: AI analyzed the evidence to determine optimal report sections (finding summary, corroborating evidence, contested areas, cross-corpus signals, etc.).
+5. **Narrative Synthesis**: Each section was generated with inline [N] citations.
+6. **Landscape Scoring**: Confidence, consensus, and source-diversity scores were computed heuristically from evidence weights, KG corroboration ratios, and domain Gini spread.
 
 {stats}
 
-**Sub-claims Investigated:**
+**Sub-questions Investigated:**
 {chr(10).join(["- " + t for t in sub_claims_explored[:15]]) if sub_claims_explored else "- " + session.claim}
 
 {self._format_verification_section(verification_metrics, evidence) if verification_metrics else ""}
@@ -1551,14 +1561,14 @@ This verdict report was generated using a hierarchical multi-agent fact-checking
 
 ---
 
-*Verdict report generated by Meridian Fact-Checker*
+*Intelligence report generated by Meridian — R&D Intelligence Platform*
 """
         return report
 
     def _compile_report(
         self,
         session: CheckSession,
-        verdict_summary: str,
+        finding_summary: str,
         introduction: str,
         main_sections: list[ReportSection],
         analysis: str,
@@ -1568,9 +1578,9 @@ This verdict report was generated using a hierarchical multi-agent fact-checking
         sub_claims_explored: list[str],
         kg_exports: dict = None,
     ) -> str:
-        """Compile all sections into the final verdict report."""
+        """Compile all sections into the final intelligence report (legacy fixed structure)."""
         toc_items = [
-            "1. Verdict Summary",
+            "1. Finding Summary",
             "2. Introduction",
         ]
         for i, section in enumerate(main_sections, 3):
@@ -1601,21 +1611,20 @@ This verdict report was generated using a hierarchical multi-agent fact-checking
         references_text = "\n\n".join(references)
 
         retrieval_date = datetime.now().strftime("%B %d, %Y")
-
-        verdict_str = session.verdict.upper() if session.verdict else "UNDETERMINED"
+        scores_badge = self._scores_badge(session)
 
         sub_claims_count = len(sub_claims_explored) if sub_claims_explored else len(sources)
-        stats = f"""**Fact-Check Statistics:**
+        stats = f"""**Audit Statistics:**
 - Total Evidence Collected: {len(evidence)}
 - Sources Analyzed: {len(sources)}
-- Sub-claims Investigated: {sub_claims_count}
-- Check Duration: {session.started_at.strftime("%Y-%m-%d %H:%M")} to {session.ended_at.strftime("%Y-%m-%d %H:%M") if session.ended_at else "In Progress"}"""
+- Sub-questions Investigated: {sub_claims_count}
+- Run Duration: {session.started_at.strftime("%Y-%m-%d %H:%M")} to {session.ended_at.strftime("%Y-%m-%d %H:%M") if session.ended_at else "In Progress"}"""
 
-        report = f"""# Fact-Check: {session.claim}
+        report = f"""# Meridian Intelligence Audit: {session.claim}
 
-*Verdict Report*
+*Landscape Report*
 
-**Verdict: {verdict_str}**
+{scores_badge}
 
 ---
 
@@ -1630,9 +1639,9 @@ This verdict report was generated using a hierarchical multi-agent fact-checking
 
 ---
 
-## 1. Verdict Summary
+## 1. Finding Summary
 
-{verdict_summary}
+{finding_summary}
 
 ---
 
@@ -1664,27 +1673,27 @@ This verdict report was generated using a hierarchical multi-agent fact-checking
 
 ---
 
-## Appendix: Fact-Check Methodology
+## Appendix: Audit Methodology
 
-This verdict report was generated using a hierarchical multi-agent fact-checking system:
+This intelligence report was generated using a hierarchical multi-agent R&D research system:
 
-1. **Claim Decomposition**: An AI director agent analyzed the claim and decomposed it into verifiable sub-claims.
-2. **Evidence Gathering**: AI intern agents conducted {len(sources)} web searches, analyzing sources for relevance and credibility.
-3. **Evidence Extraction**: {len(evidence)} discrete pieces of evidence were extracted and categorized by type (facts, insights, connections, etc.).
+1. **Brief Decomposition**: An AI director agent analyzed the research brief and decomposed it into investigable sub-questions.
+2. **Evidence Gathering**: AI intern agents conducted {len(sources)} searches across web, academic, patent, standards, regulatory, and internal sources.
+3. **Evidence Extraction**: {len(evidence)} discrete pieces of evidence were extracted, tagged by corpus (internal / external), and categorized by type.
 4. **Critical Review**: Each batch of evidence was critiqued for accuracy, relevance, and gaps.
 5. **Knowledge Graph Construction**: Evidence was integrated into a real-time knowledge graph for gap detection and contradiction analysis.
-6. **Narrative Synthesis**: An AI writer (Claude Opus) synthesized evidence into this cohesive verdict report using extended thinking for deep analysis.
+6. **Landscape Synthesis**: An AI writer (Claude Opus) synthesized the evidence into a confidence-scored landscape with contested areas and white space surfaced explicitly.
 
 {stats}
 
-**Sub-claims Investigated:**
+**Sub-questions Investigated:**
 {chr(10).join(["- " + t for t in sub_claims_explored[:15]]) if sub_claims_explored else "- " + session.claim}
 
 {self._format_kg_section(kg_exports) if kg_exports else ""}
 
 ---
 
-*Verdict report generated by Meridian Fact-Checker*
+*Intelligence report generated by Meridian — R&D Intelligence Platform*
 """
         return report
 
@@ -1828,3 +1837,8 @@ async def _emit_progress(
     except Exception:
         logger.warning("Progress callback failed: %s", message, exc_info=True)
         return
+
+
+# Backward-compat alias — kept so existing callers continue to work during the
+# Phase 2 migration. New code should use `IntelligenceReportWriter` directly.
+VerdictReportWriter = IntelligenceReportWriter

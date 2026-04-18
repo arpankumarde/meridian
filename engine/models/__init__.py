@@ -7,18 +7,18 @@ from .evidence import (
     Evidence,
     EvidenceType,
     EvidenceReport,
+    Finding,
     InternReport,
+    LandscapeReport,
     ManagerDirective,
     ManagerReport,
     SubClaim,
-    Verdict,
     VerificationDirective,
     VerdictReport,
     is_meta_question,
 )
 
 # Backward-compat aliases used by some modules
-Finding = Evidence
 FindingType = EvidenceType
 ResearchSession = CheckSession
 ResearchTopic = SubClaim
@@ -33,12 +33,12 @@ __all__ = [
     "Finding",
     "FindingType",
     "InternReport",
+    "LandscapeReport",
     "ManagerDirective",
     "ManagerReport",
     "ResearchSession",
     "ResearchTopic",
     "SubClaim",
-    "Verdict",
     "VerdictReport",
     "VerificationDirective",
     "is_meta_question",

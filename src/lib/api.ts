@@ -5,7 +5,10 @@ export interface Session {
   goal: string;
   claim?: string;
   status: string;
-  verdict?: string;
+  mode?: string;
+  confidence?: number | null;
+  consensus?: number | null;
+  source_diversity?: number | null;
   max_iterations: number;
   created_at: string;
   completed_at?: string | null;
@@ -47,6 +50,7 @@ export interface StartCheckBody {
   claim: string;
   max_iterations: number;
   autonomous: boolean;
+  mode?: string;
   enable_mid_questions?: boolean;
 }
 

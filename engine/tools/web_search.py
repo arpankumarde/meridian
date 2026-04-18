@@ -49,6 +49,13 @@ class SearchResult:
     engine: str = "google"
     platform: str | None = None          # detected platform (e.g. "reddit_posts")
     platform_data: dict | None = None    # structured data from platform scraper
+    # Corpus origin — tools that pull from external sources (web, academic,
+    # patents, standards, regulatory) keep the default "external".
+    # GDriveSearchTool overrides to "internal" so downstream evidence rows
+    # and KG nodes are tagged correctly for cross-corpus edge detection.
+    corpus: str = "external"
+    # Optional structured patent metadata (populated by PatentSearchTool)
+    patent_data: dict | None = None
 
 
 class _HTMLTextExtractor(HTMLParser):

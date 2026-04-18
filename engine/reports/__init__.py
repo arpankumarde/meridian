@@ -1,5 +1,5 @@
-"""Verdict report generation module."""
+"""Intelligence report generation module."""
 
-from .writer import VerdictReportWriter, ReportSection
+from .writer import IntelligenceReportWriter, ReportSection, VerdictReportWriter
 
-__all__ = ["VerdictReportWriter", "ReportSection"]
+__all__ = ["IntelligenceReportWriter", "ReportSection", "VerdictReportWriter"]

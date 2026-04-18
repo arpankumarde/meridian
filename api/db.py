@@ -1,25 +1,25 @@
 """
 Database service for API.
 
-Thin wrapper around VeritasDatabase that adds API-specific query methods
+Thin wrapper around MeridianDatabase that adds API-specific query methods
 (filtered listings, pagination, aggregated stats with joins).
 """
 import json as _json
 
 from engine.models.evidence import CheckSession
-from engine.storage.database import VeritasDatabase
+from engine.storage.database import MeridianDatabase
 
 
 class APIDatabase:
     """Database wrapper for API endpoints.
 
-    Uses VeritasDatabase via composition for connection pooling, schema
+    Uses MeridianDatabase via composition for connection pooling, schema
     management, and common CRUD operations.  Adds read-only query methods
     needed by the REST API (filtered listings, pagination, aggregated joins).
     """
 
     def __init__(self, db_path: str = "meridian.db"):
-        self._core = VeritasDatabase(db_path)
+        self._core = MeridianDatabase(db_path)
 
     async def connect(self):
         """Connect to database (delegates to core pool)."""

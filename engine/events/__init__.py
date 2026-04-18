@@ -143,11 +143,19 @@ async def emit_error(
     )
 
 
-async def emit_verdict(
-    session_id: str, agent: str, verdict: str, confidence: float | None = None,
+async def emit_landscape(
+    session_id: str,
+    agent: str,
+    confidence: float | None = None,
+    consensus: float | None = None,
+    source_diversity: float | None = None,
 ) -> None:
-    """Emit a verdict determination event."""
-    data: dict[str, Any] = {"verdict": verdict}
+    """Emit a landscape synthesis event with the confidence/consensus/diversity triple."""
+    data: dict[str, Any] = {}
     if confidence is not None:
         data["confidence"] = confidence
-    await emit_agent_event(session_id, "verdict", agent, data)
+    if consensus is not None:
+        data["consensus"] = consensus
+    if source_diversity is not None:
+        data["source_diversity"] = source_diversity
+    await emit_agent_event(session_id, "landscape", agent, data)

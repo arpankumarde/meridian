@@ -29,7 +29,7 @@ from ..retrieval.query_expansion import (
     QueryExpansionConfig,
     merge_search_results,
 )
-from ..storage.database import VeritasDatabase
+from ..storage.database import MeridianDatabase
 from ..tools.web_search import SearchResult, WebSearchTool
 
 from ..logging_config import get_logger
@@ -82,6 +82,94 @@ def _is_academic_topic(topic: str) -> bool:
     return any(indicator in topic_lower for indicator in academic_indicators)
 
 
+def _is_patent_topic(topic: str) -> bool:
+    """Detect if a topic would benefit from patent search."""
+    patent_indicators = [
+        "patent",
+        "prior art",
+        "prior-art",
+        "invention",
+        "inventor",
+        "uspto",
+        "epo",
+        "claim",
+        "claims",
+        "cpc",
+        "ipc",
+        "assignee",
+        "ip filing",
+        "ip strategy",
+        "freedom to operate",
+        "fto",
+        "disclosure",
+        "patentability",
+    ]
+    topic_lower = topic.lower()
+    return any(ind in topic_lower for ind in patent_indicators)
+
+
+def _is_standards_topic(topic: str) -> bool:
+    """Detect if a topic would benefit from standards-body search."""
+    standards_indicators = [
+        "standard",
+        "standards",
+        "iso",
+        "ieee",
+        "astm",
+        "nist",
+        "iec",
+        "ansi",
+        "rfc",
+        "specification",
+        "spec",
+        "compliance",
+        "conformance",
+        "certification",
+        "interoperability",
+        "protocol",
+    ]
+    topic_lower = topic.lower()
+    return any(ind in topic_lower for ind in standards_indicators)
+
+
+def _is_regulatory_topic(topic: str) -> bool:
+    """Detect if a topic would benefit from regulatory-body search."""
+    regulatory_indicators = [
+        "fda",
+        "sec",
+        "ema",
+        "regulation",
+        "regulatory",
+        "10-k",
+        "10k",
+        "8-k",
+        "s-1",
+        "edgar",
+        "filing",
+        "approval",
+        "cleared",
+        "clearance",
+        "authorization",
+        "openfda",
+        "recall",
+        "enforcement",
+        "510(k)",
+        "de novo",
+        "ind",
+        "nda",
+        "bla",
+        "ema",
+        "marketing authorization",
+        "clinical trial",
+        "adverse event",
+        "safety report",
+        "securities",
+        "annual report",
+    ]
+    topic_lower = topic.lower()
+    return any(ind in topic_lower for ind in regulatory_indicators)
+
+
 class InternAgent(BaseAgent):
     """The Intern agent searches the web and reports evidence to the Manager.
 
@@ -96,7 +184,7 @@ class InternAgent(BaseAgent):
 
     def __init__(
         self,
-        db: VeritasDatabase,
+        db: MeridianDatabase,
         config: AgentConfig | None = None,
         console: Console | None = None,
         verification_pipeline: Optional["VerificationPipeline"] = None,
@@ -122,6 +210,50 @@ class InternAgent(BaseAgent):
             logger.warning("Academic search initialization failed: %s", e, exc_info=True)
             if console:
                 console.print(f"[dim]Academic search unavailable: {e}[/dim]")
+
+        # Initialize patent search (USPTO PatentsView + Google Patents fallback)
+        try:
+            from ..tools.patent_search import PatentSearchTool
+
+            self.patent_search = PatentSearchTool(max_results=10)
+        except Exception as e:
+            self.patent_search = None
+            logger.warning("Patent search initialization failed: %s", e, exc_info=True)
+            if console:
+                console.print(f"[dim]Patent search unavailable: {e}[/dim]")
+
+        # Initialize standards search (IEEE / ISO / ASTM / NIST metadata)
+        try:
+            from ..tools.standards_search import StandardsSearchTool
+
+            self.standards_search = StandardsSearchTool(max_results=10)
+        except Exception as e:
+            self.standards_search = None
+            logger.warning("Standards search initialization failed: %s", e, exc_info=True)
+            if console:
+                console.print(f"[dim]Standards search unavailable: {e}[/dim]")
+
+        # Initialize regulatory search (SEC EDGAR + openFDA + EMA)
+        try:
+            from ..tools.regulatory_search import RegulatorySearchTool
+
+            self.regulatory_search = RegulatorySearchTool(max_results=10)
+        except Exception as e:
+            self.regulatory_search = None
+            logger.warning("Regulatory search initialization failed: %s", e, exc_info=True)
+            if console:
+                console.print(f"[dim]Regulatory search unavailable: {e}[/dim]")
+
+        # Initialize Google Drive (internal corpus) search
+        try:
+            from ..tools.gdrive_search import GDriveSearchTool
+
+            self.gdrive_search = GDriveSearchTool(max_results=8)
+        except Exception as e:
+            self.gdrive_search = None
+            logger.warning("GDrive search initialization failed: %s", e, exc_info=True)
+            if console:
+                console.print(f"[dim]GDrive search unavailable: {e}[/dim]")
 
         # Initialize query expander
         self.query_expander = QueryExpander(
@@ -397,10 +529,25 @@ Be brief - just state your decision and reason."""
 
         self._log(f"[Search] {query[:80]}...", style="cyan")
 
+        # Pull tool hints from the active directive if the Manager set any.
+        # Hints are an explicit override — detection heuristics are a fallback.
+        directive_hints: list[str] = []
+        if self.current_directive is not None:
+            directive_hints = list(
+                getattr(self.current_directive, "tool_hints", []) or []
+            )
+        hints_set = {h.lower() for h in directive_hints}
+
+        def _wants(tool_name: str, heuristic: bool) -> bool:
+            """Tool runs if the Manager hinted it OR the heuristic matches."""
+            if hints_set:
+                return tool_name in hints_set
+            return heuristic
+
         results, summary = await self.search_tool.search(query)
 
-        # Also search academic if relevant (parallel)
-        if self.academic_search and _is_academic_topic(topic):
+        # Academic search (Semantic Scholar + arXiv)
+        if self.academic_search and _wants("academic", _is_academic_topic(topic)):
             try:
                 academic_results, _ = await self.academic_search.search(topic)
                 if academic_results:
@@ -409,6 +556,87 @@ Be brief - just state your decision and reason."""
                     results = new_academic[:3] + results
             except Exception:
                 pass
+
+        # Patent search (USPTO PatentsView + Google Patents fallback)
+        if self.patent_search and _wants("patents", _is_patent_topic(topic)):
+            try:
+                patent_results, patent_summary = await self.patent_search.search(topic)
+                if patent_results:
+                    existing_urls = {r.url for r in results}
+                    new_patents = [
+                        r for r in patent_results if r.url not in existing_urls
+                    ]
+                    results = new_patents[:3] + results
+                    if patent_summary:
+                        summary = (
+                            f"{summary}\n\n{patent_summary}" if summary else patent_summary
+                        )
+            except Exception as e:
+                logger.warning("Patent search failed: %s", e, exc_info=True)
+
+        # Standards search (IEEE / ISO / ASTM / NIST metadata)
+        if self.standards_search and _wants("standards", _is_standards_topic(topic)):
+            try:
+                standards_results, standards_summary = await self.standards_search.search(
+                    topic
+                )
+                if standards_results:
+                    existing_urls = {r.url for r in results}
+                    new_stds = [
+                        r for r in standards_results if r.url not in existing_urls
+                    ]
+                    results = new_stds[:3] + results
+                    if standards_summary:
+                        summary = (
+                            f"{summary}\n\n{standards_summary}"
+                            if summary
+                            else standards_summary
+                        )
+            except Exception as e:
+                logger.warning("Standards search failed: %s", e, exc_info=True)
+
+        # Regulatory search (SEC EDGAR + openFDA + EMA)
+        if self.regulatory_search and _wants(
+            "regulatory", _is_regulatory_topic(topic)
+        ):
+            try:
+                reg_results, reg_summary = await self.regulatory_search.search(topic)
+                if reg_results:
+                    existing_urls = {r.url for r in results}
+                    new_reg = [r for r in reg_results if r.url not in existing_urls]
+                    results = new_reg[:3] + results
+                    if reg_summary:
+                        summary = (
+                            f"{summary}\n\n{reg_summary}" if summary else reg_summary
+                        )
+            except Exception as e:
+                logger.warning("Regulatory search failed: %s", e, exc_info=True)
+
+        # Internal corpus search (Google Drive) — always runs when the tool
+        # is available, because internal evidence is the highest-value signal
+        # per PRD §8. No heuristic gate; cross-corpus edges only emerge if
+        # internal chunks flow into the evidence pool.
+        if self.gdrive_search and _wants("gdrive", True):
+            try:
+                internal_results, internal_summary = await self.gdrive_search.search(
+                    topic
+                )
+                if internal_results:
+                    # Internal results get priority placement — they're the
+                    # scarce corpus and the Manager should see them first.
+                    existing_urls = {r.url for r in results}
+                    new_internal = [
+                        r for r in internal_results if r.url not in existing_urls
+                    ]
+                    results = new_internal[:3] + results
+                    if internal_summary:
+                        summary = (
+                            f"{summary}\n\n{internal_summary}"
+                            if summary
+                            else internal_summary
+                        )
+            except Exception as e:
+                logger.warning("GDrive search failed: %s", e, exc_info=True)
 
         return results, summary, [query] if results else []
 
@@ -778,6 +1006,15 @@ Output ONLY the search query (15-25 words max), nothing else."""
                     if parts:
                         content = f"{content} [{'; '.join(parts)}]"
 
+                # Look up the source SearchResult so we can thread its corpus
+                # tag (internal vs external) onto the persisted Evidence.
+                source_corpus = "external"
+                if source_url:
+                    for r in results:
+                        if r.url == source_url:
+                            source_corpus = getattr(r, "corpus", None) or "external"
+                            break
+
                 evidence_item = Evidence(
                     session_id=session_id,
                     content=content,
@@ -785,6 +1022,7 @@ Output ONLY the search query (15-25 words max), nothing else."""
                     source_url=source_url,
                     confidence=f.get("confidence", 0.7),
                     search_query=query,
+                    corpus=source_corpus,
                 )
 
                 # Run streaming verification if pipeline is available
@@ -884,6 +1122,7 @@ Output ONLY the search query (15-25 words max), nothing else."""
                         source_url=r.url,
                         confidence=0.6,
                         search_query=query,
+                        corpus=getattr(r, "corpus", None) or "external",
                     )
 
                     # Run streaming verification if pipeline is available

@@ -25,7 +25,7 @@ from ..costs.tracker import get_cost_tracker
 from ..events import emit_action, emit_agent_event, emit_error, emit_thinking
 from ..logging_config import get_logger
 from ..models.findings import AgentMessage, AgentRole
-from ..storage.database import VeritasDatabase
+from ..storage.database import MeridianDatabase
 
 logger = get_logger(__name__)
 
@@ -150,7 +150,7 @@ class BaseAgent(ABC):
     def __init__(
         self,
         role: AgentRole,
-        db: VeritasDatabase,
+        db: MeridianDatabase,
         config: AgentConfig | None = None,
         console: Console | None = None,
         session_id: str | None = None,

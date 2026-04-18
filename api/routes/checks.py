@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/checks", tags=["checks"])
 
 # Track running fact-check sessions and their harnesses
 running_checks: dict[str, asyncio.Task] = {}
-running_harnesses: dict[str, object] = {}  # session_id -> VeritasHarness
+running_harnesses: dict[str, object] = {}  # session_id -> MeridianHarness
 
 
 class StartCheckRequest(BaseModel):
@@ -45,15 +45,21 @@ class EnrichRequest(BaseModel):
 
 
 async def _haiku_callback(prompt: str, **kwargs) -> str:
-    import anthropic
+    from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, TextBlock, query
 
-    client = anthropic.AsyncAnthropic()
-    response = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
+    options = ClaudeAgentOptions(
+        model="haiku",
+        max_turns=1,
+        allowed_tools=[],
     )
-    return "".join(block.text for block in response.content if block.type == "text")
+
+    response_text = ""
+    async for message in query(prompt=prompt, options=options):
+        if isinstance(message, AssistantMessage):
+            for block in message.content:
+                if isinstance(block, TextBlock):
+                    response_text += block.text
+    return response_text
 
 
 def _build_interaction(max_questions: int):
@@ -75,7 +81,7 @@ async def run_check_background(session_id: str, claim: str, max_iterations: int,
     """
     Run fact-check in the background.
 
-    This imports and runs the actual VeritasHarness.
+    This imports and runs the actual MeridianHarness.
     """
     print(f"\n{'='*60}")
     print("STARTING BACKGROUND FACT-CHECK")
@@ -87,8 +93,8 @@ async def run_check_background(session_id: str, claim: str, max_iterations: int,
     print(f"{'='*60}\n")
 
     try:
-        print("Importing VeritasHarness...")
-        from engine.agents.director import VeritasHarness
+        print("Importing MeridianHarness...")
+        from engine.agents.director import MeridianHarness
         from engine.interaction import InteractionConfig
         print("Import successful")
 
@@ -111,7 +117,7 @@ async def run_check_background(session_id: str, claim: str, max_iterations: int,
         print(f"Config created (mid_questions: {enable_mid_questions}, autonomous: {autonomous})")
 
         print("Starting fact-check harness...")
-        async with VeritasHarness(
+        async with MeridianHarness(
             db_path="meridian.db",
             interaction_config=interaction_config,
             max_depth=max_depth,
@@ -318,7 +324,7 @@ async def run_check_resume_background(session_id: str):
 
     try:
         from api.db import get_db
-        from engine.agents.director import VeritasHarness
+        from engine.agents.director import MeridianHarness
         from engine.interaction import InteractionConfig
 
         db = await get_db()
@@ -334,7 +340,7 @@ async def run_check_resume_background(session_id: str):
             autonomous_mode=True,
         )
 
-        async with VeritasHarness(
+        async with MeridianHarness(
             db_path="meridian.db",
             interaction_config=interaction_config,
         ) as harness:

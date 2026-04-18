@@ -7,14 +7,20 @@ import EvidenceBrowser from "@/components/evidence-browser";
 import ReportPreview from "@/components/report-preview";
 import SourcesBrowser from "@/components/sources-browser";
 import QuestionModal from "@/components/question-modal";
+import { ConfidenceMeter } from "@/components/confidence-meter";
 import { ResearchWebSocket } from "@/lib/websocket";
 import Link from "next/link";
 
 interface Session {
   session_id: string;
   goal: string;
+  claim?: string;
   max_iterations: number;
   status: string;
+  mode?: string;
+  confidence?: number | null;
+  consensus?: number | null;
+  source_diversity?: number | null;
   created_at: string;
   completed_at?: string | null;
   elapsed_seconds?: number;
@@ -25,7 +31,7 @@ interface Session {
 const tabs = [
   { id: "activity", label: "Live Activity", icon: "stream" },
   { id: "evidence", label: "Evidence", icon: "description" },
-  { id: "report", label: "Verdict Report", icon: "article" },
+  { id: "report", label: "Intelligence Report", icon: "article" },
   { id: "graph", label: "Knowledge Graph", icon: "hub" },
   { id: "sources", label: "Sources", icon: "travel_explore" },
   { id: "agents", label: "Agents", icon: "psychology" },
@@ -240,14 +246,25 @@ console.log("ab: ", session)
                 <span className="material-symbols-outlined">arrow_back</span>
               </Link>
               <div className="min-w-0">
-                <h1 className="text-xl font-display font-semibold line-clamp-2 leading-tight">{session.claim}</h1>
+                <h1 className="text-xl font-display font-semibold line-clamp-2 leading-tight">{session.claim ?? session.goal}</h1>
                 <div className="flex items-center gap-4 mt-2 text-[11px] text-text-muted font-mono">
                   <span>#{session.session_id.slice(0, 8)}</span>
                   <span className="flex items-center gap-1">
                     <span className="material-symbols-outlined text-[13px]">schedule</span>
                     {formatDate(session.created_at)}
                   </span>
+                  {session.mode && <span className="uppercase">mode: {session.mode}</span>}
                 </div>
+                {(session.confidence != null || session.consensus != null || session.source_diversity != null) && (
+                  <div className="mt-3">
+                    <ConfidenceMeter
+                      confidence={session.confidence}
+                      consensus={session.consensus}
+                      sourceDiversity={session.source_diversity}
+                      size="sm"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -312,13 +329,13 @@ console.log("ab: ", session)
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-rose">warning</span>
               <div>
-                <p className="text-sm font-medium text-rose">This fact check session crashed unexpectedly</p>
+                <p className="text-sm font-medium text-rose">This audit session crashed unexpectedly</p>
                 <p className="text-xs text-text-secondary">Progress was saved. You can resume from the last checkpoint.</p>
               </div>
             </div>
             <button onClick={handleResume} disabled={actionPending} className="obs-btn btn-primary text-xs py-1 px-3">
               <span className="material-symbols-outlined text-sm">play_arrow</span>
-              Resume Check
+              Resume Audit
             </button>
           </div>
         </div>
@@ -331,7 +348,7 @@ console.log("ab: ", session)
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-gold">pause_circle</span>
               <div>
-                <p className="text-sm font-medium text-gold">Fact check is paused</p>
+                <p className="text-sm font-medium text-gold">Audit is paused</p>
                 <p className="text-xs text-text-secondary">All progress has been saved. Resume when ready.</p>
               </div>
             </div>

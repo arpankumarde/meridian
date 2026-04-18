@@ -37,6 +37,21 @@ async def get_knowledge_stats(session_id: str):
     return await kg.get_stats(session_id=session_id)
 
 
+@router.get("/{session_id}/knowledge/cross-corpus")
+async def get_cross_corpus(
+    session_id: str,
+    limit: int = Query(default=500, ge=1, le=2000),
+):
+    """Return cross-corpus relations for a session, bucketed by signal type.
+
+    Response buckets: corroborations, contradictions, prior_art, overlaps,
+    citations, white_space. Each bucket is a list of relation rows joining
+    subject and object entity names.
+    """
+    kg = get_kg()
+    return await kg.get_cross_corpus_edges(session_id=session_id, limit=limit)
+
+
 @router.get("/{session_id}/knowledge/entity/{entity_id}")
 async def get_entity_detail(session_id: str, entity_id: str):
     """Get a single entity with its relations."""
