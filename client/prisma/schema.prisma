@@ -7,8 +7,100 @@ datasource db {
   provider = "postgresql"
 }
 
+model Organization {
+  id            String         @id @default(uuid())
+  name          String
+  domain        String         @unique
+  logo          String?
+  users         User[]
+  subscriptions Subscription[]
+  orders        Order[]
+  meta          Json?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
 model User {
-  id    String @id @default(uuid())
-  email String @unique
-  name  String
+  id             String        @id @default(uuid())
+  email          String        @unique
+  password       String
+  emailVerified  Boolean       @default(false)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  otps           Otp[]
+  meta           Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([organizationId])
+}
+
+model Otp {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code       String
+  purpose    String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  meta       Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, purpose])
+}
+
+model Subscription {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan           String       @default("QUARTERLY")
+  amount         Int          @default(2499900)
+  currency       String       @default("INR")
+  status         String       @default("PENDING")
+  startsAt       DateTime?
+  endsAt         DateTime?
+  orders         Order[]
+  meta           Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+model Order {
+  id             String        @id @default(uuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  pgOrderId      String        @unique
+  gateway        String        @default("RAZORPAY")
+  amount         Int
+  currency       String        @default("INR")
+  receipt        String?
+  status         String        @default("CREATED")
+  payments       Payment[]
+  meta           Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([organizationId])
+  @@index([subscriptionId])
+}
+
+model Payment {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  pgPaymentId String   @unique
+  pgSignature String?
+  amount      Int
+  currency    String   @default("INR")
+  method      String?
+  status      String   @default("CREATED")
+  meta        Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orderId])
 }
