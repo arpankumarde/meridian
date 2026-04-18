@@ -1,0 +1,1071 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* shadcn tokens — bound to brand (light theme, white page) */
+  --background: #ffffff;
+  --foreground: rgb(26 26 26);
+  --card: #ffffff;
+  --card-foreground: rgb(26 26 26);
+  --popover: #ffffff;
+  --popover-foreground: rgb(26 26 26);
+  --primary: rgb(28 12 158); /* brand indigo */
+  --primary-foreground: #ffffff;
+  --secondary: rgb(15 151 170); /* brand teal */
+  --secondary-foreground: #ffffff;
+  --muted: rgb(248 248 248);
+  --muted-foreground: rgb(102 102 102);
+  --accent: rgb(231 247 250); /* pale teal for hover backgrounds */
+  --accent-foreground: rgb(28 12 158); /* indigo text on teal wash */
+  --destructive: rgb(220 38 38);
+  --border: rgb(229 229 229);
+  --input: rgb(229 229 229);
+  --ring: rgb(28 12 158 / 0.45);
+  --chart-1: oklch(0.65 0.18 264);
+  --chart-2: oklch(0.6 0.16 200);
+  --chart-3: oklch(0.55 0.14 150);
+  --chart-4: oklch(0.7 0.12 80);
+  --chart-5: oklch(0.65 0.15 320);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.15 0.02 260);
+  --sidebar-foreground: oklch(0.96 0.005 260);
+  --sidebar-primary: oklch(0.65 0.18 264);
+  --sidebar-primary-foreground: oklch(0.98 0.005 260);
+  --sidebar-accent: oklch(0.22 0.025 260);
+  --sidebar-accent-foreground: oklch(0.96 0.005 260);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.65 0.18 264);
+
+  /* ── Serious Light Theme (Dify/Cohere inspired) ── */
+  --void: 255 255 255;
+  --surface: 250 250 250;
+  --surface-hover: 245 245 245;
+  --surface-inset: 248 248 248;
+  --obs-border: 229 229 229;
+  --border-light: 240 240 240;
+
+  --text: 26 26 26;
+  --text-secondary: 102 102 102;
+  --text-muted: 153 153 153;
+
+  /* ── Brand palette (derived from logo) ──
+     Primary deep indigo pulled directly from the Meridian mark.
+     Secondary teal is the mark's counter-color.
+     Both are kept at true-brand saturation for small UI (buttons, icons, text);
+     large surfaces should use the -soft / -softer tints to keep the white
+     background comfortable. */
+
+  /* Primary: Brand Indigo (#1c0c9e) */
+  --amber: 28 12 158;
+  --amber-hover: 20 8 120;
+  --amber-soft: 235 232 250;
+  --amber-softer: 245 243 252;
+
+  /* Secondary: Brand Teal (#0f97aa) */
+  --cyan: 15 151 170;
+  --cyan-hover: 11 122 138;
+  --cyan-soft: 231 247 250;
+
+  /* Tertiary: Knowledge-graph Violet (reserved for KG edges) */
+  --violet: 124 58 237;
+  --violet-soft: 245 243 255;
+
+  /* Brand gradient stops - used by animated atmospheric layers */
+  --brand-grad-a: 28 12 158; /* indigo */
+  --brand-grad-b: 15 151 170; /* teal */
+
+  /* Success: Forest Green */
+  --emerald: 22 163 74;
+  --emerald-soft: 240 253 244;
+
+  /* Error: Crimson */
+  --rose: 220 38 38;
+  --rose-soft: 254 242 242;
+
+  /* Warning: Ochre */
+  --gold: 202 138 4;
+  --gold-soft: 254 252 232;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.08);
+  --shadow-lg: 0 12px 24px rgb(0 0 0 / 0.12);
+  --shadow-glow: none;
+}
+
+@theme inline {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-mono: "Space Mono", ui-monospace, monospace;
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Observatory color tokens as Tailwind classes */
+  --color-void: rgb(var(--void));
+  --color-surface: rgb(var(--surface));
+  --color-surface-hover: rgb(var(--surface-hover));
+  --color-surface-inset: rgb(var(--surface-inset));
+  --color-obs-border: rgb(var(--obs-border));
+  --color-border-light: rgb(var(--border-light));
+  --color-text: rgb(var(--text));
+  --color-text-secondary: rgb(var(--text-secondary));
+  --color-text-muted: rgb(var(--text-muted));
+  --color-amber: rgb(var(--amber));
+  --color-amber-hover: rgb(var(--amber-hover));
+  --color-amber-soft: rgb(var(--amber-soft));
+  --color-amber-softer: rgb(var(--amber-softer));
+  --color-cyan: rgb(var(--cyan));
+  --color-cyan-hover: rgb(var(--cyan-hover));
+  --color-cyan-soft: rgb(var(--cyan-soft));
+  --color-violet: rgb(var(--violet));
+  --color-violet-soft: rgb(var(--violet-soft));
+  --color-emerald: rgb(var(--emerald));
+  --color-emerald-soft: rgb(var(--emerald-soft));
+  --color-rose: rgb(var(--rose));
+  --color-rose-soft: rgb(var(--rose-soft));
+  --color-gold: rgb(var(--gold));
+  --color-gold-soft: rgb(var(--gold-soft));
+
+  --animate-breathe: breathe 2s ease-in-out infinite;
+  --animate-rise: rise 0.5s ease-out both;
+  --animate-scale-up: scale-up 0.25s ease-out both;
+  --animate-marquee: marquee 40s linear infinite;
+  --animate-float: float 4s ease-in-out infinite;
+  --animate-aurora: aurora 24s ease-in-out infinite;
+  --animate-hairline: hairline 8s ease-in-out infinite;
+
+  /* Premium Typography (Cohere-inspired) */
+  --font-size-hero: clamp(2.5rem, 6vw, 5rem);
+  --font-size-section: clamp(2rem, 4vw, 3rem);
+  --font-size-sub: clamp(1.125rem, 2vw, 1.25rem);
+
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+  @keyframes rise {
+    from {
+      transform: translateY(12px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  @keyframes scale-up {
+    from {
+      transform: scale(0.95);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  @keyframes aurora {
+    0%,
+    100% {
+      transform: translate3d(-6%, -4%, 0) scale(1);
+      opacity: 0.55;
+    }
+    50% {
+      transform: translate3d(6%, 4%, 0) scale(1.08);
+      opacity: 0.85;
+    }
+  }
+  @keyframes hairline {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    border-color: rgb(var(--obs-border));
+  }
+  body {
+    @apply bg-background text-foreground;
+    background: rgb(var(--void));
+    color: rgb(var(--text));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
+  }
+  html {
+    @apply font-sans;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgb(var(--surface));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--border-light));
+    border-radius: 99px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--text-muted));
+  }
+}
+
+@layer components {
+  /* ── Cards ── */
+  .obs-card {
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--obs-border));
+    border-radius: 1rem;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .card-hover {
+    transition: all 300ms;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    border-color: rgb(var(--amber) / 0.2);
+    box-shadow:
+      var(--shadow-md),
+      0 0 0 1px rgb(var(--amber) / 0.08);
+  }
+
+  .glass-panel {
+    background: rgb(var(--surface) / 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgb(var(--obs-border) / 0.5);
+  }
+
+  /* ── Structural Grid (Dify-inspired) ── */
+  .grid-container {
+    display: grid;
+    border: 1px solid rgb(var(--obs-border));
+    background: rgb(var(--obs-border) / 0.1);
+    gap: 1px;
+  }
+
+  .grid-cell {
+    background: rgb(var(--void));
+    padding: 2rem;
+    height: 100%;
+  }
+
+  /* ── Typography Utilities ── */
+  .font-hero {
+    font-family: var(--font-display);
+    font-size: var(--font-size-hero);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    font-weight: 500;
+  }
+
+  .font-section {
+    font-family: var(--font-display);
+    font-size: var(--font-size-section);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+
+  .font-sub {
+    font-size: var(--font-size-sub);
+    line-height: 1.6;
+    color: rgb(var(--text-secondary));
+  }
+
+  /* Buttons are provided by shadcn/ui — see components/ui/button.tsx.
+     The shadcn --primary / --secondary / --ring tokens are bound to the
+     brand palette at the top of :root. */
+
+  /* ── Inputs ── */
+  .obs-input {
+    background: rgb(var(--surface-inset));
+    border: 1px solid rgb(var(--obs-border));
+    border-radius: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: rgb(var(--text));
+    transition: all 200ms;
+  }
+  .obs-input::placeholder {
+    color: rgb(var(--text-muted));
+  }
+  .obs-input:focus {
+    outline: none;
+    border-color: rgb(var(--amber) / 0.4);
+    box-shadow: 0 0 0 1px rgb(var(--amber) / 0.2);
+  }
+
+  /* ── Badges ── */
+  .obs-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-width: 1px;
+  }
+
+  .badge-search {
+    background: rgb(var(--amber-soft));
+    color: rgb(var(--amber));
+    border-color: rgb(var(--amber) / 0.2);
+  }
+
+  .badge-finding {
+    background: rgb(var(--emerald-soft));
+    color: rgb(var(--emerald));
+    border-color: rgb(var(--emerald) / 0.2);
+  }
+
+  .badge-thinking {
+    background: rgb(var(--violet-soft));
+    color: rgb(var(--violet));
+    border-color: rgb(var(--violet) / 0.2);
+  }
+
+  .badge-verify {
+    background: rgb(var(--gold-soft));
+    color: rgb(var(--gold));
+    border-color: rgb(var(--gold) / 0.2);
+  }
+
+  .badge-warning {
+    background: rgb(var(--gold-soft));
+    color: rgb(var(--gold));
+    border-color: rgb(var(--gold) / 0.2);
+  }
+
+  .badge-error {
+    background: rgb(var(--rose-soft));
+    color: rgb(var(--rose));
+    border-color: rgb(var(--rose) / 0.2);
+  }
+
+  .badge-action {
+    background: rgb(var(--amber-soft));
+    color: rgb(var(--amber));
+    border-color: rgb(var(--amber) / 0.2);
+  }
+
+  .badge-system {
+    background: rgb(var(--obs-border) / 0.3);
+    color: rgb(var(--text-muted));
+    border-color: rgb(var(--obs-border));
+  }
+
+  .badge-success {
+    background: rgb(var(--emerald-soft));
+    color: rgb(var(--emerald));
+    border-color: rgb(var(--emerald) / 0.2);
+  }
+
+  /* ── Status dots ── */
+  .status-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+  }
+
+  .status-dot-active {
+    background: rgb(var(--emerald));
+    box-shadow: 0 0 8px rgb(var(--emerald) / 0.5);
+  }
+
+  .status-dot-idle {
+    background: rgb(var(--text-muted));
+  }
+
+  .status-dot-error {
+    background: rgb(var(--rose));
+  }
+
+  .status-dot-pending {
+    background: rgb(var(--gold));
+  }
+
+  .pulse-ring {
+    position: relative;
+  }
+
+  .pulse-ring::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    animation: breathe 2s ease-in-out infinite;
+    background: inherit;
+    opacity: 0.75;
+  }
+
+  /* ── Timeline ── */
+  .timeline-connector {
+    position: absolute;
+    width: 2px;
+    background: rgb(var(--obs-border));
+    left: 14px;
+    top: 2rem;
+    bottom: -2rem;
+    z-index: 0;
+  }
+
+  .timeline-item:last-child .timeline-connector {
+    display: none;
+  }
+
+  /* ── Segmented control ── */
+  .segmented-control {
+    display: flex;
+    background: rgb(var(--surface-inset));
+    padding: 0.25rem;
+    border-radius: 0.75rem;
+  }
+
+  .segmented-control label {
+    flex: 1;
+    cursor: pointer;
+  }
+
+  .segmented-control input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .segmented-control .segment {
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: rgb(var(--text-muted));
+    border-radius: 0.5rem;
+    transition: all 200ms;
+  }
+
+  .segmented-control input:checked + .segment {
+    background: rgb(var(--surface));
+    color: rgb(var(--amber));
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ── Report markdown ── */
+  .report-markdown h1 {
+    font-size: 1.5rem;
+    font-family: "Fraunces", Georgia, serif;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    color: rgb(var(--text));
+  }
+
+  .report-markdown h2 {
+    font-size: 1.25rem;
+    font-family: "Fraunces", Georgia, serif;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+    color: rgb(var(--text));
+  }
+
+  .report-markdown h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    color: rgb(var(--text));
+  }
+
+  .report-markdown p {
+    font-size: 0.875rem;
+    color: rgb(var(--text) / 0.8);
+    line-height: 1.625;
+    margin-bottom: 0.75rem;
+  }
+
+  .report-markdown blockquote {
+    border-left: 4px solid rgb(var(--amber) / 0.4);
+    padding-left: 1.5rem;
+    font-style: italic;
+    color: rgb(var(--text-secondary));
+    margin: 2rem 0;
+    background: rgb(var(--amber-softer));
+    padding-top: 0.75rem;
+    padding-right: 1rem;
+    padding-bottom: 0.75rem;
+    border-top-right-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+  }
+
+  .report-markdown ul {
+    list-style: disc;
+    list-style-position: outside;
+    margin-left: 1.5rem;
+    margin-bottom: 1rem;
+    color: rgb(var(--text-secondary));
+  }
+  .report-markdown ul > li + li {
+    margin-top: 0.5rem;
+  }
+
+  .report-markdown ol {
+    list-style: decimal;
+    list-style-position: outside;
+    margin-left: 1.5rem;
+    margin-bottom: 1rem;
+    color: rgb(var(--text-secondary));
+  }
+  .report-markdown ol > li + li {
+    margin-top: 0.5rem;
+  }
+
+  .report-markdown code {
+    font-size: 0.75rem;
+    background: rgb(var(--surface-inset));
+    border: 1px solid rgb(var(--obs-border));
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    color: rgb(var(--amber));
+  }
+
+  .report-markdown pre {
+    font-size: 0.75rem;
+    background: rgb(var(--surface-inset));
+    border: 1px solid rgb(var(--obs-border));
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    overflow-x: auto;
+    margin-bottom: 0.75rem;
+  }
+
+  .report-markdown hr {
+    border-color: rgb(var(--obs-border));
+    margin: 1.5rem 0;
+  }
+
+  .report-markdown strong {
+    font-weight: 600;
+    color: rgb(var(--text));
+  }
+
+  .report-markdown em {
+    font-style: italic;
+    color: rgb(var(--text-secondary));
+  }
+
+  .report-markdown a {
+    color: rgb(var(--amber));
+    cursor: pointer;
+  }
+  .report-markdown a:hover {
+    text-decoration: underline;
+  }
+
+  .report-markdown table {
+    width: 100%;
+    font-size: 0.875rem;
+  }
+
+  .report-markdown thead {
+    background: rgb(var(--surface-inset));
+    border-bottom: 1px solid rgb(var(--obs-border));
+  }
+
+  .report-markdown tbody tr + tr {
+    border-top: 1px solid rgb(var(--obs-border) / 0.5);
+  }
+
+  .report-markdown th {
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgb(var(--text-secondary));
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.625rem 1rem;
+  }
+
+  .report-markdown td {
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    color: rgb(var(--text));
+  }
+
+  .report-markdown tr:hover {
+    background: rgb(var(--surface-hover) / 0.5);
+  }
+
+  /* ── Citation buttons ── */
+  .citation-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    height: 1.25rem;
+    padding: 0 0.375rem;
+    margin: 0 0.125rem;
+    font-size: 10px;
+    font-weight: 700;
+    color: rgb(var(--amber));
+    background: rgb(var(--amber-soft));
+    border-radius: 0.25rem;
+    cursor: pointer;
+    box-shadow: 0 0 0 1px rgb(var(--amber) / 0.3);
+    transition: all 200ms;
+  }
+  .citation-btn:hover {
+    background: rgb(var(--amber) / 0.2);
+  }
+
+  /* ── Chips (filter toggles) ── */
+  .obs-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: rgb(var(--text-secondary));
+    background: rgb(var(--surface-inset));
+    border: 1px solid rgb(var(--obs-border));
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: all 200ms;
+  }
+  .obs-chip:hover {
+    color: rgb(var(--text));
+    border-color: rgb(var(--text-muted));
+  }
+
+  .chip-active {
+    color: rgb(var(--amber));
+    border-color: rgb(var(--amber) / 0.4);
+    background: rgb(var(--amber-soft));
+  }
+
+  /* ── Tabs ── */
+  .tab-bar {
+    display: flex;
+    border-bottom: 1px solid rgb(var(--obs-border));
+    gap: 0.25rem;
+  }
+
+  .tab-item {
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: rgb(var(--text-muted));
+    border-bottom: 2px solid transparent;
+    transition: all 200ms;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .tab-item:hover {
+    color: rgb(var(--text));
+  }
+
+  .tab-item-active {
+    color: rgb(var(--amber));
+    border-bottom-color: rgb(var(--amber));
+  }
+
+  /* ── Grain overlay ── */
+  .grain::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ── Glow line accent ── */
+  .glow-line {
+    height: 1px;
+    width: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(var(--amber) / 0.5) 30%,
+      rgb(var(--amber)) 50%,
+      rgb(var(--amber) / 0.5) 70%,
+      transparent 100%
+    );
+  }
+
+  /* ── Brand hairline (animated, indigo ⇄ teal) ──
+     1px divider that slowly cycles between the two logo stops. Stays low-
+     saturation at the ends so a white page reads calm; midpoint holds full
+     brand color for only a moment. */
+  .brand-hairline {
+    height: 1px;
+    width: 100%;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(var(--brand-grad-a) / 0.35) 25%,
+      rgb(var(--brand-grad-b) / 0.55) 50%,
+      rgb(var(--brand-grad-a) / 0.35) 75%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: hairline 8s ease-in-out infinite;
+  }
+
+  /* ── Aurora atmosphere ──
+     Drop inside a `relative overflow-hidden` section to add a very faint,
+     slowly drifting indigo-to-teal wash behind content. Opacity is capped
+     low so it never competes with text on the white background. */
+  .aurora {
+    position: absolute;
+    inset: -20%;
+    z-index: 0;
+    pointer-events: none;
+    filter: blur(60px);
+    opacity: 0.35;
+    background:
+      radial-gradient(
+        40% 40% at 22% 30%,
+        rgb(var(--brand-grad-a) / 0.18),
+        transparent 70%
+      ),
+      radial-gradient(
+        40% 40% at 78% 70%,
+        rgb(var(--brand-grad-b) / 0.18),
+        transparent 70%
+      ),
+      radial-gradient(
+        35% 35% at 60% 20%,
+        rgb(var(--brand-grad-b) / 0.1),
+        transparent 75%
+      );
+    animation: aurora 24s ease-in-out infinite;
+  }
+
+  /* ── Brand ring (subtle teal breathing glow) ──
+     Wraps a button or active element to get a slow-breathing indigo→teal
+     ring. Reads as "live / active" without the harsh shadow-under-button
+     look. Requires parent to be `relative` with `isolation: isolate`. */
+  .brand-ring {
+    position: relative;
+    isolation: isolate;
+  }
+  .brand-ring::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: conic-gradient(
+      from 0deg,
+      rgb(var(--brand-grad-a) / 0),
+      rgb(var(--brand-grad-a) / 0.35),
+      rgb(var(--brand-grad-b) / 0.35),
+      rgb(var(--brand-grad-a) / 0)
+    );
+    opacity: 0.45;
+    z-index: -1;
+    animation: breathe 3.2s ease-in-out infinite;
+    filter: blur(6px);
+  }
+
+  /* ── Brand text gradient ──
+     Short accent phrases only (a word or two). Both stops are dark enough
+     that contrast stays above AA against white. */
+  .brand-text-gradient {
+    background: linear-gradient(
+      105deg,
+      rgb(var(--brand-grad-a)) 0%,
+      rgb(var(--brand-grad-b)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* ── Brand dot grid ──
+     Tiny indigo/teal dot pattern for hero or section backgrounds. Drops
+     into atmosphere without blowing out the white page. */
+  .brand-dotgrid {
+    background-image:
+      radial-gradient(rgb(var(--brand-grad-a) / 0.1) 1px, transparent 1px),
+      radial-gradient(rgb(var(--brand-grad-b) / 0.06) 1px, transparent 1px);
+    background-size:
+      28px 28px,
+      28px 28px;
+    background-position:
+      0 0,
+      14px 14px;
+  }
+
+  /* ── Metric counter ── */
+  .metric {
+    font-family: "Space Mono", ui-monospace, monospace;
+    font-size: 1.875rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    background: linear-gradient(
+      135deg,
+      rgb(var(--text)),
+      rgb(var(--text-secondary))
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+@layer utilities {
+  button {
+    @apply cursor-pointer;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-fadeIn {
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .animate-slideUp {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .stagger-children > *:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  .stagger-children > *:nth-child(2) {
+    animation-delay: 80ms;
+  }
+  .stagger-children > *:nth-child(3) {
+    animation-delay: 160ms;
+  }
+  .stagger-children > *:nth-child(4) {
+    animation-delay: 240ms;
+  }
+  .stagger-children > *:nth-child(5) {
+    animation-delay: 320ms;
+  }
+  .stagger-children > *:nth-child(6) {
+    animation-delay: 400ms;
+  }
+
+  .bg-void {
+    background: rgb(var(--void));
+  }
+  .bg-surface {
+    background: rgb(var(--surface));
+  }
+  .bg-surface-hover {
+    background: rgb(var(--surface-hover));
+  }
+  .bg-surface-inset {
+    background: rgb(var(--surface-inset));
+  }
+
+  .text-text {
+    color: rgb(var(--text));
+  }
+  .text-text-secondary {
+    color: rgb(var(--text-secondary));
+  }
+  .text-text-muted {
+    color: rgb(var(--text-muted));
+  }
+
+  .text-amber {
+    color: rgb(var(--amber));
+  }
+  .text-emerald {
+    color: rgb(var(--emerald));
+  }
+  .text-violet {
+    color: rgb(var(--violet));
+  }
+  .text-rose {
+    color: rgb(var(--rose));
+  }
+  .text-gold {
+    color: rgb(var(--gold));
+  }
+  .text-cyan {
+    color: rgb(var(--cyan));
+  }
+
+  .bg-amber {
+    background: rgb(var(--amber));
+  }
+  .bg-emerald {
+    background: rgb(var(--emerald));
+  }
+  .bg-violet {
+    background: rgb(var(--violet));
+  }
+  .bg-rose {
+    background: rgb(var(--rose));
+  }
+  .bg-gold {
+    background: rgb(var(--gold));
+  }
+
+  .bg-amber-soft {
+    background: rgb(var(--amber-soft));
+  }
+  .bg-amber-softer {
+    background: rgb(var(--amber-softer));
+  }
+  .bg-emerald-soft {
+    background: rgb(var(--emerald-soft));
+  }
+  .bg-violet-soft {
+    background: rgb(var(--violet-soft));
+  }
+  .bg-rose-soft {
+    background: rgb(var(--rose-soft));
+  }
+  .bg-gold-soft {
+    background: rgb(var(--gold-soft));
+  }
+  .bg-cyan-soft {
+    background: rgb(var(--cyan-soft));
+  }
+
+  .border-amber {
+    border-color: rgb(var(--amber));
+  }
+  .border-emerald {
+    border-color: rgb(var(--emerald));
+  }
+  .border-violet {
+    border-color: rgb(var(--violet));
+  }
+  .border-rose {
+    border-color: rgb(var(--rose));
+  }
+  .border-gold {
+    border-color: rgb(var(--gold));
+  }
+  .border-obs-border {
+    border-color: rgb(var(--obs-border));
+  }
+  .border-border-light {
+    border-color: rgb(var(--border-light));
+  }
+
+  .font-display {
+    font-family: "Fraunces", Georgia, serif;
+  }
+  .font-mono {
+    font-family: "Space Mono", ui-monospace, monospace;
+  }
+}

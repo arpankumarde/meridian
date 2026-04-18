@@ -1,0 +1,88 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# env files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# databases (generated at runtime)
+*.db
+*.db-wal
+*.db-shm
+
+# Meridian runtime data
+/output/
+/meridian_retrieval/
+/meridian_kg.db
+/meridian_memory.db
+
+# ChromaDB / vector store
+/.evidence_retrieval/
+/chroma/
+
+# logs
+~/.meridian/
+*.log
+
+# misc
+.DS_Store
+*.pem
+Thumbs.db
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Prisma generated
+/src/generated/prisma
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# testing
+/coverage
+
+# spaCy models (large)
+en_core_web_sm/
+en_core_web_lg/
+
+# ML model caches
+.cache/
