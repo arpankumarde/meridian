@@ -93,7 +93,7 @@ class ModelRouter:
         'synthesis': 'opus',
         'critique': 'opus',
         'deep_analysis': 'opus',
-        'verdict_writing': 'opus',
+        'landscape_synthesis': 'opus',
     }
 
     @classmethod
@@ -123,7 +123,7 @@ class ModelRouter:
             'synthesis',
             'critique',
             'deep_analysis',
-            'verdict_writing',
+            'landscape_synthesis',
         }
         return task in thinking_tasks
 

@@ -146,7 +146,8 @@ class ManagerAgent(BaseAgent):
         )
 
         # Verification pipeline — DISABLED for speed.
-        # Fact-checking relies on evidence quality + Opus verdict, not per-finding CoVe.
+        # The landscape synthesis relies on evidence quality + Opus reasoning,
+        # not per-finding CoVe.
         self.verification_config = VerificationConfig()
         self.verification_config.enable_batch_verification = False
         self.verification_config.enable_streaming_verification = False
@@ -194,9 +195,13 @@ class ManagerAgent(BaseAgent):
         return await self.call_claude(prompt, model_override="haiku")
 
     _VERIFICATION_SYSTEM_PROMPT = (
-        "You are a fact-verification assistant. Your job is to generate verification "
-        "questions, independently answer them, and compare answers to assess factual "
-        "accuracy. Always respond using the requested structured output format."
+        "You are an evidence-quality analyst for an R&D intelligence system. "
+        "Your job is to generate independent verification questions for a given "
+        "piece of evidence, answer them from primary sources, and compare answers "
+        "to assess how well the evidence is grounded. You are not deciding TRUE "
+        "or FALSE — you are scoring how well the evidence is supported by "
+        "independent primary sources. Always respond using the requested "
+        "structured output format."
     )
 
     async def _verification_llm_callback(
@@ -263,56 +268,74 @@ class ManagerAgent(BaseAgent):
 
     @property
     def system_prompt(self) -> str:
-        return """You are a Research Brief Manager agent. You coordinate an R&D intelligence research process and produce confidence-scored landscape reports.
+        return """You are a Research Brief Manager. You coordinate an R&D intelligence audit and produce a confidence-scored landscape — never a TRUE/FALSE verdict.
 
-RESPONSIBILITIES:
-1. Decompose a research brief (a question, hypothesis, topic, or internal document) into specific sub-questions
-2. Create clear directives for the Evidence-Gathering Intern
-3. Critically evaluate evidence gathered (both corroborating AND contradicting)
+INPUT MODES (PRD §4)
+A research brief arrives in one of five forms. Adapt your decomposition accordingly:
+1. QUESTION         — an open research question. Decompose into sub-questions that span the answer space.
+2. HYPOTHESIS       — a stated belief. Decompose into corroborating, contradicting, and extending angles. Replications and rebuttals are first-class.
+3. TOPIC            — a broad area. Decompose into the major sub-areas and surface what each says, plus the white space between them.
+4. BRIEF            — a multi-part research request. Decompose into named work-streams.
+5. INTERNAL DOC     — a starting internal R&D document. Decompose into the external claims that doc makes or assumes, then look for external corroboration / contradiction / prior art / extension.
+
+RESPONSIBILITIES
+1. Decompose the brief into focused, independently-investigable sub-questions
+2. Create clear directives for the R&D Evidence Analyst (Intern), including a tool hint when the sub-question maps to a specific corpus
+3. Critically evaluate evidence — corroborating, contradicting, extending, and overlapping
 4. Identify gaps, contested areas, and white space in the literature
-5. Weigh evidence quality, source credibility, and independence
-6. Surface cross-corpus signals — where internal R&D work agrees, disagrees, or overlaps with external literature, patents, standards, or filings
+5. Weigh evidence quality, source credibility, and source independence
+6. Surface cross-corpus signals — where internal R&D work agrees with, disagrees with, predates, overlaps with, cites, or sits alone next to (white space) external literature, patents, standards, and filings
 
-RESEARCH STRATEGY:
+CROSS-CORPUS EDGE TYPES (PRD §8 — produced by the cross-corpus engine, named explicitly so you reason about them)
+- internal_corroborates_external          — internal R&D supports an external claim
+- internal_contradicts_external           — internal R&D contradicts an external claim
+- external_predates_internal              — external work published earlier; internal may be reinventing prior art
+- external_overlaps_with_internal_claim   — external work overlaps; not strict corroboration but adjacent
+- external_cites_internal                 — external work cites internal output (rare but high-value)
+- external_white_space_near_internal      — external literature is silent near an internal claim (potential novelty or risk)
+
+These edges only exist when BOTH internal and external evidence has been gathered. Push the Intern to populate the internal side first if it's empty.
+
+RESEARCH STRATEGY
 - Decompose complex briefs into focused, independently-investigable sub-questions
-- For each sub-question, seek BOTH corroborating and contradicting evidence
-- Prioritize primary sources (papers, patents, filings, government data) over secondary reporting
-- Cross-reference multiple independent sources — agreement across independent work is a stronger signal than a single authoritative source
-- Pay special attention to internal-vs-external edges: they are the highest-value signal
-- Look for contested areas (high confidence, low consensus) — they are often the most informative findings
+- For each sub-question, seek corroborating, contradicting, AND extending evidence
+- Prioritize primary sources (papers, patents, filings, standards, lab research/engineering blogs) over secondary reporting
+- Cross-reference multiple independent sources — agreement across independent primary work is stronger than a single authoritative source
+- Pay special attention to internal-vs-external edges — they are the highest-value signal
+- Surface contested areas (high confidence, low consensus) — they are often the most informative findings
 
-EVIDENCE EVALUATION FRAMEWORK:
+EVIDENCE EVALUATION FRAMEWORK
 When reviewing evidence, consider:
-- Accuracy: Is this from a credible, verifiable source?
-- Relevance: Does this directly address the sub-question?
-- Strength: Is this direct evidence or circumstantial?
-- Independence: Are sources independently confirming, or echoing one upstream source?
-- Recency: Is the evidence current and applicable?
-- Corpus: Is this internal (our own work) or external (literature, patents, standards)?
+- Accuracy     : Is this from a credible, verifiable primary source?
+- Relevance    : Does this directly address the sub-question?
+- Strength     : Direct evidence or circumstantial?
+- Independence : Are sources independently confirming, or echoing one upstream source?
+- Recency      : Current and applicable?
+- Corpus       : Internal (our own work) or external (literature, patents, standards, filings)?
 
-LANDSCAPE SCORING:
-You DO NOT output TRUE/FALSE verdicts. Instead, the final synthesis produces three 0-1 scores:
-- CONFIDENCE: how strong is the evidence base overall (weighted by credibility)
-- CONSENSUS: how much do the sources agree with each other (corroboration vs contradiction ratio in the KG)
-- SOURCE DIVERSITY: how spread are the sources (a single authoritative source is weaker than five independent ones)
+LANDSCAPE SCORING (no verdicts)
+The final synthesis produces three 0-1 scores:
+- CONFIDENCE       — strength of the evidence base overall, weighted by credibility
+- CONSENSUS        — agreement vs disagreement among sources (supports vs contradicts in the KG)
+- SOURCE DIVERSITY — spread across independent sources (a single authoritative source is weaker than five independent ones)
 
-A finding with high confidence and low consensus is a CONTESTED AREA — surface it explicitly, do not flatten it into a verdict.
-A region the literature has not covered near an internal claim is WHITE SPACE — also surface it.
+High confidence + low consensus = CONTESTED AREA — surface it explicitly, do not flatten it.
+External silence near an internal claim = WHITE SPACE — also surface it.
 
-QUALITY STANDARDS:
+QUALITY STANDARDS
 - Reject evidence that is speculation presented as fact
 - Flag contradictions — do not resolve them prematurely
-- Prioritize primary sources over secondary
+- Prioritize primary sources over secondary; deprioritize social media, UGC Q&A, and SEO content
 - Note when confidence is low — uncalibrated confidence is acceptable, overclaiming is not
 - Weight verified evidence higher than unverified
 
-OUTPUT FORMAT:
-Provide structured analysis with clear reasoning. When creating directives:
+DIRECTIVE FORMAT
+When creating a directive for the Intern:
 - Be specific about what evidence to search for
 - Explain why this angle matters for the landscape
-- Set appropriate priority (1-10)
-- Define what would constitute corroborating vs contradicting evidence
-- When a sub-question naturally maps to a specific corpus (patents, standards, regulatory filings, internal docs), include a tool hint in the directive"""
+- Set priority (1-10)
+- Define what would count as corroborating vs contradicting vs extending evidence
+- When a sub-question maps to a specific corpus (patents, standards, regulatory filings, internal docs, academic, industry research), include a tool hint so the Intern dispatches to the right tool"""
 
     async def think(self, context: dict[str, Any]) -> str:
         """Reason about verification progress and next steps."""
@@ -562,7 +585,7 @@ Think step by step about the best next action."""
             directive = VerificationDirective(
                 action="search",
                 topic=topic.topic,
-                instructions=f"Gather evidence for and against this sub-claim: {topic.topic}",
+                instructions=f"Gather corroborating, contradicting, and extending evidence for this sub-question. Prefer primary sources (papers, patents, filings, lab research blogs). Sub-question: {topic.topic}",
                 priority=topic.priority,
                 max_searches=2,
             )
@@ -880,8 +903,10 @@ Think step by step about the best next action."""
     async def _create_directive(self, thought: str) -> VerificationDirective | None:
         """Create a directive for the Intern based on reasoning."""
         prompt = (
-            f"Based on this reasoning:\n{thought}\n\nCreate a directive for the Evidence-Gathering Intern. "
-            "The directive should specify what evidence to search for, including both supporting and contradicting evidence."
+            f"Based on this reasoning:\n{thought}\n\nCreate a directive for the R&D Evidence Analyst (Intern). "
+            "The directive should specify exactly what evidence to search for and call out the corpora that matter "
+            "(internal docs, academic, patents, standards, regulatory, or general web). Ask for evidence that "
+            "CORROBORATES, CONTRADICTS, and EXTENDS the brief. Prefer primary sources."
         )
 
         schema = {
@@ -1032,9 +1057,9 @@ Verification Summary:
 - Rejected (low confidence): {len(rejected)}
 """
 
-        prompt = f"""Critique this evidence report for the claim verification:
+        prompt = f"""Critique this evidence report from the R&D Evidence Analyst:
 
-Topic: {report.topic}
+Sub-question: {report.topic}
 Searches: {report.searches_performed}
 {verification_summary}
 Evidence:
@@ -1043,12 +1068,13 @@ Evidence:
 Suggested follow-ups: {report.suggested_followups}
 
 Evaluate:
-1. Quality of evidence (strength, accuracy, relevance to the claim)
-2. Balance: Is there evidence both FOR and AGAINST the claim?
-3. Verification status - pay special attention to flagged and rejected items
-4. Coverage (what angles are missing?)
-5. Credibility of sources
-6. Suggestions for finding contradicting or confirming evidence
+1. Quality of evidence (strength, accuracy, relevance to the sub-question, primary vs secondary sources)
+2. Balance: corroborating, contradicting, AND extending evidence — or lopsided?
+3. Verification status — pay special attention to flagged and rejected items
+4. Corpus coverage: did internal sources get searched? Are external sources from credible primary outlets (papers, patents, filings, lab research blogs) or weak (SEO blogs, social, UGC)?
+5. Coverage gaps — what angles are missing?
+6. Cross-corpus signal potential — does this evidence enable any internal↔external edges (corroborates / contradicts / predates / overlaps / cites / white-space)?
+7. Suggestions for finding contradicting or extending evidence
 
 Be constructive but rigorous. Flag any rejected evidence that should be re-investigated."""
 
@@ -1178,16 +1204,20 @@ Key Evidence (sorted by priority, tagged with corpus):
 Sub-questions investigated: {[t.topic for t in self.completed_topics]}
 Sub-questions remaining: {[t.topic for t in self.topics_queue[:5]]}
 
-Knowledge graph summary:
+Knowledge graph summary (includes cross-corpus edges):
 {kg_summary or "(not available)"}
 
 Produce:
-1. A 2-3 paragraph executive summary describing what the evidence shows, what is contested, and what is missing.
-2. A list of KEY FINDINGS — each one an interpretive statement grounded in specific evidence, not a paraphrase of a single source.
-3. CONTESTED AREAS — topics with conflicting evidence (do NOT resolve them prematurely).
-4. WHITE SPACE — questions the literature has not answered.
-5. CROSS-CORPUS HIGHLIGHTS — where internal and external evidence corroborate, contradict, or overlap.
-6. Quality assessment of the overall evidence base.
+1. A 2-3 paragraph executive summary describing what the evidence shows, what is contested, and what is missing. No verdict.
+2. KEY FINDINGS — each an interpretive statement grounded in specific evidence with inline source citation, not a paraphrase of a single source.
+3. CONTESTED AREAS — topics with conflicting evidence (do NOT resolve them prematurely; name the sources on each side).
+4. WHITE SPACE — questions the external literature has not answered, especially near internal claims.
+5. CROSS-CORPUS HIGHLIGHTS — explicitly call out which of the six edge types fired:
+   - internal_corroborates_external, internal_contradicts_external,
+     external_predates_internal, external_overlaps_with_internal_claim,
+     external_cites_internal, external_white_space_near_internal.
+   If no internal evidence was gathered, say so plainly — that is itself an actionable finding.
+6. Quality assessment of the overall evidence base — name credible primary sources (papers, patents, filings, lab research blogs from OpenAI/Anthropic/DeepMind/Meta AI/Qwen/etc., medical literature) and flag where the base leans on weaker sources.
 7. Recommended next research directions.
 
 DO NOT output a TRUE/FALSE/MIXED verdict. Do not collapse the landscape into a single label.
@@ -1195,7 +1225,7 @@ Focus on what the evidence actually says, what it disagrees on, and what it does
 
         # Use Opus with extended thinking — this is the one call where deep
         # reasoning matters most.
-        response = await self.call_claude(prompt, use_thinking=True, model_override="opus")
+        response = await self.call_claude(prompt, use_thinking=True, task_type="landscape_synthesis", model_override="opus")
 
         # Compute the three landscape scores (heuristic for v1; see PRD §11.4)
         confidence, consensus, source_diversity = await self._score_landscape(key_evidence)
@@ -1335,7 +1365,7 @@ Focus on what the evidence actually says, what it disagrees on, and what it does
             VerificationDirective(
                 action="search",
                 topic=aspect,
-                instructions=f"Gather evidence for and against this aspect of the claim: {aspect}",
+                instructions=f"Gather corroborating, contradicting, and extending evidence for this research angle. Prefer primary sources (papers, patents, filings, lab research blogs). Angle: {aspect}",
                 priority=8,
                 max_searches=2,
             )
@@ -1423,7 +1453,7 @@ Focus on what the evidence actually says, what it disagrees on, and what it does
             VerificationDirective(
                 action="search",
                 topic=topic.topic,
-                instructions=f"Gather evidence for and against this sub-claim: {topic.topic}",
+                instructions=f"Gather corroborating, contradicting, and extending evidence for this sub-question. Prefer primary sources (papers, patents, filings, lab research blogs). Sub-question: {topic.topic}",
                 priority=topic.priority,
                 max_searches=2,
             )

@@ -41,45 +41,57 @@ if TYPE_CHECKING:
 
 
 def _is_academic_topic(topic: str) -> bool:
-    """Detect if a topic would benefit from academic search."""
+    """Detect if a topic would benefit from academic / preprint search.
+
+    Covers research methodology, biomedical, life sciences, and the broader
+    STEM disciplines that publish into Semantic Scholar / arXiv / PubMed.
+    """
     academic_indicators = [
-        "research",
-        "study",
-        "paper",
-        "journal",
-        "scientific",
-        "evidence",
-        "theory",
-        "hypothesis",
-        "experiment",
-        "analysis",
-        "review",
-        "survey",
-        "methodology",
-        "framework",
-        "algorithm",
-        "clinical",
-        "trial",
-        "treatment",
-        "disease",
-        "medical",
-        "mechanism",
-        "model",
-        "simulation",
-        "data",
-        "statistical",
-        "peer-reviewed",
-        "published",
-        "findings",
-        "literature",
-        "thesis",
-        "dissertation",
-        "academic",
-        "scholar",
-        "university",
+        # Research methodology
+        "research", "study", "paper", "journal", "scientific", "evidence",
+        "theory", "hypothesis", "experiment", "analysis", "review", "survey",
+        "methodology", "framework", "algorithm", "model", "simulation",
+        "data", "statistical", "peer-reviewed", "published", "findings",
+        "literature", "thesis", "dissertation", "academic", "scholar",
+        "university", "preprint", "arxiv", "biorxiv", "medrxiv",
+        # Medical / biomedical / life sciences
+        "clinical", "trial", "treatment", "disease", "medical", "mechanism",
+        "diagnosis", "prognosis", "epidemiology", "pharmacology", "oncology",
+        "cardiology", "neurology", "immunology", "genomics", "proteomics",
+        "biology", "biotech", "bioinformatics", "biomarker", "vaccine",
+        "therapeutic", "molecular", "cellular", "in vivo", "in vitro",
+        "cohort", "randomized", "rct", "meta-analysis", "systematic review",
+        # Other STEM
+        "physics", "chemistry", "materials science", "quantum", "nanotech",
+        "robotics", "neuroscience", "psychology", "economics",
     ]
     topic_lower = topic.lower()
     return any(indicator in topic_lower for indicator in academic_indicators)
+
+
+def _is_industry_research_topic(topic: str) -> bool:
+    """Detect if a topic would benefit from industry AI/ML research blogs.
+
+    Routes to Bright Data SERP with a bias toward known lab domains
+    (OpenAI, Anthropic, DeepMind, Meta AI, Qwen, etc.). The intern's
+    web search tool already returns from these when relevant; this flag
+    is mainly a hint for query construction.
+    """
+    industry_indicators = [
+        # Model families and lab names
+        "gpt", "claude", "gemini", "llama", "mistral", "qwen", "deepseek",
+        "phi", "grok", "command", "sonnet", "opus", "haiku",
+        "openai", "anthropic", "deepmind", "meta ai", "google research",
+        "microsoft research", "huggingface", "cohere", "stability",
+        "nvidia research", "apple ml", "amazon science", "allen ai",
+        # Capability terms commonly written up by labs
+        "rlhf", "dpo", "rlaif", "constitutional ai", "mixture of experts",
+        "moe", "long context", "agentic", "tool use", "function calling",
+        "alignment", "fine-tuning", "instruction tuning", "embedding model",
+        "foundation model", "frontier model", "llm", "llms",
+    ]
+    topic_lower = topic.lower()
+    return any(indicator in topic_lower for indicator in industry_indicators)
 
 
 def _is_patent_topic(topic: str) -> bool:
@@ -171,15 +183,18 @@ def _is_regulatory_topic(topic: str) -> bool:
 
 
 class InternAgent(BaseAgent):
-    """The Intern agent searches the web and reports evidence to the Manager.
+    """The Intern agent gathers primary-source evidence for the Manager.
 
     Responsibilities:
-    - Execute web searches based on Manager directives
-    - Find evidence BOTH supporting AND contradicting claims
-    - Extract relevant information from search results
-    - Identify primary sources, official records, and expert opinions
+    - Execute searches across the internal corpus, academic, patent, standards,
+      regulatory, and web tools based on Manager directives
+    - Find evidence that CORROBORATES, CONTRADICTS, or EXTENDS the research brief
+    - Extract substantive findings (with quantitative results where present)
+    - Prioritize primary sources (papers, patents, filings, standards, lab
+      research/engineering blogs) over secondary reporting
+    - Preserve the corpus tag (internal vs external) on every Evidence item so
+      the Manager can compute cross-corpus edges
     - Suggest follow-up angles for deeper investigation
-    - Report evidence back to the Manager
     """
 
     def __init__(
@@ -307,41 +322,70 @@ class InternAgent(BaseAgent):
     @property
     def system_prompt(self) -> str:
         current_year = _get_current_year()
-        return f"""You are a Fact-Checking Intern agent. Your ONLY job is to find evidence that SUPPORTS or CONTRADICTS claims.
+        return f"""You are an R&D Evidence Analyst. Your job is to find primary-source evidence that informs a research brief — evidence that can CORROBORATE, CONTRADICT, EXTEND, or sit alongside (overlap with) what the team already knows. You do NOT produce TRUE/FALSE verdicts. You report evidence with provenance.
 
-CRITICAL RULES:
-1. You MUST use web search for ALL information - NEVER use your training data
-2. Your knowledge cutoff is irrelevant - always search for current information
-3. Generate specific, effective search queries
-4. When asked what to search, respond with ONLY the search query string
-5. ALWAYS search for BOTH supporting AND contradicting evidence - never be one-sided
+CRITICAL RULES
+1. ALWAYS use the search tools for every query — never rely on training data. Your knowledge cutoff is irrelevant.
+2. The corpus tag on every Evidence item matters. `internal` (Google Drive) evidence is the highest-value signal because cross-corpus edges only exist when both sides are populated. Surface internal results first when present.
+3. Find evidence that CORROBORATES, CONTRADICTS, or EXTENDS the brief — and note when sources overlap or sit silent on a topic (white space).
+4. When asked to generate a search query, respond with ONLY the query string.
 
-SEARCH STRATEGY:
-- Search for evidence supporting the claim
-- Search for evidence contradicting the claim
-- Search for the original source of the claim
-- Look for expert opinions and official statements
-- Search for fact-checks already published on this claim
-- Use specific terms, dates ({current_year}), and key phrases
-- Look for primary sources: government data, academic papers, official records
-- Academic papers from arXiv, Semantic Scholar, and PubMed are automatically searched when relevant
+AVAILABLE SEARCH TOOLS (already wired — pick the right one for each angle)
+- Internal corpus (Google Drive)        — internal R&D documents; runs on every search
+- Academic (Semantic Scholar + arXiv)   — peer-reviewed papers and preprints across CS, biomedical, physical sciences
+- Patents (USPTO PatentsView + Google)  — prior art, freedom-to-operate, IP landscape
+- Standards (IEEE / ISO / ASTM / NIST)  — interoperability, conformance, protocol specs
+- Regulatory (SEC EDGAR + openFDA + EMA) — corporate filings, drug/device approvals, recalls
+- Web (Bright Data SERP)                — general web for everything else
 
-SOURCE PRIORITIZATION:
-- Official government data and statistics (highest priority)
-- Peer-reviewed papers and preprints
-- Established fact-checking organizations (Snopes, PolitiFact, FactCheck.org)
-- Reputable news organizations with editorial standards
-- Technical documentation and official records
-- Expert interviews and statements
-- Blog posts and social media (lowest priority)
+SOURCE PRIORITIZATION
 
-EVIDENCE TYPES:
-- FACT: Verified, specific information (dates, numbers, events)
-- INSIGHT: Analysis or interpretation from credible sources
-- CONNECTION: Links between claims or related facts
-- SOURCE: A valuable primary source to investigate further
-- QUESTION: An unanswered question worth investigating
-- CONTRADICTION: Conflicting information that needs resolution
+Tier 1 — primary sources. Always prefer:
+  - Peer-reviewed journals: Nature, Science, Cell, NEJM, Lancet, JAMA, BMJ, PNAS, IEEE, ACM, Springer, ScienceDirect, Wiley
+  - Preprints: arXiv, bioRxiv, medRxiv, OpenReview, ACL Anthology, SSRN
+  - Patents: USPTO, EPO (Espacenet), Google Patents, WIPO
+  - Standards: IEEE, ISO, IETF RFCs, NIST, W3C, ETSI, 3GPP
+  - Regulatory: SEC EDGAR, FDA / openFDA, EMA, ClinicalTrials.gov
+  - Government / agency data: NIH, CDC, WHO, NIST
+  - Official AI/ML lab research and engineering pages — OpenAI (openai.com/research), Anthropic (anthropic.com/research, anthropic.com/news), DeepMind (deepmind.google), Meta AI (ai.meta.com), Google Research (research.google, ai.googleblog.com), Microsoft Research (research.microsoft.com), Qwen (qwenlm.github.io), Hugging Face (huggingface.co — papers + model cards), Mistral, Cohere, NVIDIA Research (nvidia.com), Apple Machine Learning (apple.com/machine-learning), Amazon Science (amazon.science), Allen AI (allenai.org)
+  - Medical & life-sciences literature — PubMed, NEJM, The Lancet, JAMA, BMJ, Nature, Science, Cell, NIH, CDC, WHO, ClinicalTrials.gov, Cochrane Library, openFDA, EMA
+  - Trusted technical engineering blogs: engineering.fb.com, netflixtechblog.com, eng.uber.com, stripe.com/blog/engineering, github.blog, blog.cloudflare.com, aws.amazon.com/blogs/architecture, cloud.google.com/blog
+
+Tier 2 — secondary, only when primary unavailable:
+  - Reputable news with editorial standards: Reuters, AP, BBC, FT, WSJ, Bloomberg, Economist, NYT, Washington Post
+
+Tier 3 — orientation only, never primary evidence:
+  - Wikipedia (use for context and to find cited primary sources, never as the source itself)
+  - Stack Overflow (technical pointers, not authoritative claims)
+
+AVOID — do not cite as evidence:
+  - Facebook, Instagram, TikTok, Pinterest, Snapchat — social, not source material
+  - Quora, Yahoo Answers, eHow, wikiHow — UGC Q&A
+  - Anonymous Medium / Substack posts (named-author posts by recognized researchers are fine)
+  - SEO content farms and listicle sites
+
+EVIDENCE TYPES
+- FACT          : Verified specific information (dates, numbers, results, measurements)
+- INSIGHT       : Analysis or interpretation from a credible source
+- CONNECTION    : A link between two findings, sources, or concepts
+- SOURCE        : A primary source worth deeper investigation
+- QUESTION      : An unanswered question worth following up
+- CONTRADICTION : Conflicting information across sources
+
+WHAT TO EXTRACT
+For each piece of evidence, capture:
+1. The substantive content (1-2 sentences). Include quantitative results VERBATIM — datasets, metrics, baselines, percentages, sample sizes, p-values.
+2. The evidence type (above)
+3. The source URL
+4. A confidence score (0-1) reflecting source quality and clarity
+5. For papers: dataset name, primary metric, baseline comparison
+6. The corpus the source belongs to (internal / external) — already tagged on the SearchResult; preserve it
+
+QUERY TIPS
+- Use the current year ({current_year}) to bias for recency
+- Use site: operators when the angle calls for a specific corpus (site:arxiv.org, site:openai.com/research, site:patents.uspto.gov, site:fda.gov, site:nih.gov)
+- Prefer specific technical keywords over generic phrases
+- For replication / contradiction queries, search for "limitations", "failure mode", "did not replicate", "rebuttal", "comment on"
 
 When generating a search query, output ONLY the query text, nothing else."""
 
@@ -352,21 +396,21 @@ When generating a search query, output ONLY the query text, nothing else."""
 
         # For first iteration, just indicate we need to search
         if self.searches_performed == 0:
-            return f"Starting evidence gathering on: {directive.topic}. Need to search for both supporting and contradicting evidence."
+            return f"Starting evidence gathering on: {directive.topic}. Will look for corroborating, contradicting, and extending evidence across the internal corpus and primary external sources."
 
         # For subsequent iterations, assess progress
         evidence_summary = (
             ", ".join([e.content[:50] for e in self.evidence[-3:]]) if self.evidence else "none yet"
         )
 
-        prompt = f"""Verification topic: {directive.topic}
+        prompt = f"""Research angle: {directive.topic}
 Searches done: {self.searches_performed}/{directive.max_searches}
 Evidence so far: {len(self.evidence)}
 Recent evidence: {evidence_summary}
 
-Should I continue searching or compile report? If continue, what aspect should I search next?
-Remember: search for BOTH supporting AND contradicting evidence.
-Be brief - just state your decision and reason."""
+Should I continue searching or compile the report? If continue, what aspect should I search next?
+Remember: seek evidence that CORROBORATES, CONTRADICTS, or EXTENDS the brief, and prefer primary sources (papers, patents, filings, lab research blogs).
+Be brief — just state your decision and reason."""
 
         return await self.call_claude(prompt)
 
@@ -757,7 +801,7 @@ Be brief - just state your decision and reason."""
             return await self._expand_query(directive.topic, current_year, session_id)
 
         # Subsequent searches - use diverse query expansion
-        prompt = f"""Verification topic: {directive.topic}
+        prompt = f"""Research angle: {directive.topic}
 Searches done: {self.searches_performed}
 Previous evidence: {len(self.evidence)}
 
@@ -766,11 +810,12 @@ Recent evidence summary:
 
 Generate ONE specific search query to find NEW evidence not covered by existing items.
 Focus on:
-- Evidence that CONTRADICTS the claim (if mostly supporting so far)
-- Evidence that SUPPORTS the claim (if mostly contradicting so far)
-- Different angles or perspectives
-- Recent developments ({current_year})
-- Primary sources (official records, research papers, government data)
+- Evidence that CONTRADICTS the brief (if existing evidence is mostly corroborating)
+- Evidence that CORROBORATES the brief (if existing evidence is mostly contradicting)
+- Evidence that EXTENDS the brief — adjacent work, follow-on studies, replications
+- Different angles, alternative methods, or competing approaches
+- Recent developments ({current_year}) — use primary-source site: operators when relevant (site:arxiv.org, site:openai.com/research, site:patents.uspto.gov, site:pubmed.ncbi.nlm.nih.gov)
+- Primary sources: papers, preprints, patents, standards, regulatory filings, lab research/engineering blogs
 
 Output ONLY the search query, nothing else."""
 
@@ -795,16 +840,16 @@ Output ONLY the search query, nothing else."""
         - Temporal scoping
         - Specificity adjustment
         """
-        prompt = f"""Expand this fact-checking topic into an effective web search query.
+        prompt = f"""Expand this R&D research angle into an effective web search query.
 
-Topic: {topic}
+Angle: {topic}
 
 Create a search query that:
-1. Includes specific keywords and synonyms
+1. Includes specific technical keywords, model names, or domain terms
 2. Targets recent information ({year})
 3. Avoids overly generic terms
-4. Is optimized for finding authoritative, primary sources
-5. Looks for both supporting and contradicting evidence
+4. Is optimized for primary sources — papers, preprints, patents, filings, official lab research/engineering pages
+5. Surfaces both corroborating and contradicting work (replications, rebuttals, limitations)
 
 Output ONLY the search query (15-25 words max), nothing else."""
 
@@ -814,7 +859,7 @@ Output ONLY the search query (15-25 words max), nothing else."""
         # Determine expansion strategy
         used_fallback = False
         if not query or len(query) > 200 or "error" in query.lower():
-            query = f"{topic} {year} fact check evidence"
+            query = f"{topic} {year} primary source research evidence"
             used_fallback = True
 
         # Log query expansion decision
