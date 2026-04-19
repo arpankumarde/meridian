@@ -36,7 +36,7 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!claim.trim()) {
-      setError("Please enter a claim to verify");
+      setError("Please enter a research brief to scan");
       return;
     }
 
@@ -138,7 +138,7 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
     }
   };
 
-  const depthLabel = maxIterations <= 3 ? "Standard" : maxIterations <= 7 ? "Detailed" : maxIterations <= 14 ? "Deep Audit" : "Absolute";
+  const depthLabel = maxIterations <= 3 ? "Standard" : maxIterations <= 7 ? "Detailed" : maxIterations <= 14 ? "Deep Scan" : "Exhaustive";
 
   return (
     <div className="bg-white border border-obs-border rounded-lg overflow-hidden relative shadow-2xl">
@@ -146,12 +146,12 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
         {/* Header */}
         <div className="space-y-1.5 border-b border-obs-border pb-5">
           <h2 className="text-xl md:text-2xl font-display font-semibold tracking-tight text-text uppercase text-center md:text-left">
-            {showClarification ? "Audit Refinement" : "Initialize Audit"}
+            {showClarification ? "Scan Refinement" : "Initialize Intelligence Scan"}
           </h2>
           <p className="text-[11px] font-mono text-text-secondary uppercase tracking-[0.2em] opacity-60 text-center md:text-left">
             {showClarification
-              ? "Refining verification scope via AI inquiry"
-              : "Configuring multi-agent verification parameters"}
+              ? "Refining research scope via AI inquiry"
+              : "Configuring multi-agent research parameters"}
           </p>
         </div>
 
@@ -169,13 +169,13 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
             {/* Claim Input */}
             <div className="space-y-2.5">
               <label className="text-[10px] font-mono font-bold text-text-muted uppercase tracking-[0.3em]">
-                Target Claim
+                Research Brief
               </label>
               <textarea
                 value={claim}
                 onChange={(e) => setClaim(e.target.value)}
                 className="w-full min-h-[100px] bg-surface border border-obs-border text-sm p-4 rounded-xl focus:outline-none focus:border-amber transition-colors text-text placeholder:text-text-muted/50 shadow-inner"
-                placeholder='e.g., "Company X reported record Q3 profits despite supply chain disruption"'
+                placeholder='Enter a question, hypothesis, topic, or brief — e.g., "Perovskite tandem solar cells, last 24 months"'
               />
             </div>
 
@@ -183,7 +183,7 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-mono font-bold text-text-muted uppercase tracking-[0.3em]">
-                  Audit Depth <span className="text-cyan ml-2 opacity-80">[{depthLabel} Assessment]</span>
+                  Scan Depth <span className="text-cyan ml-2 opacity-80">[{depthLabel} Sweep]</span>
                 </label>
                 <div className="bg-amber-soft px-3 py-0.5 rounded-full border border-amber/10">
                   <span className="text-amber font-mono text-[10px] font-bold tracking-widest">
@@ -211,7 +211,7 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
               <div className="flex items-center justify-between p-4 bg-surface border border-obs-border rounded-xl transition-all hover:bg-white hover:shadow-md cursor-pointer group">
                 <div className="flex flex-col">
                   <span className="text-[11px] font-bold text-text uppercase tracking-widest mb-0.5">Clarification</span>
-                  <span className="text-[9px] text-text-secondary uppercase tracking-[0.2em] font-medium">Pre-audit check</span>
+                  <span className="text-[9px] text-text-secondary uppercase tracking-[0.2em] font-medium">Pre-scan inquiry</span>
                 </div>
                 <input
                   type="checkbox"
@@ -223,7 +223,7 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
               <div className="flex items-center justify-between p-4 bg-surface border border-obs-border rounded-xl transition-all hover:bg-white hover:shadow-md cursor-pointer group">
                 <div className="flex flex-col">
                   <span className="text-[11px] font-bold text-text uppercase tracking-widest mb-0.5">Human in loop</span>
-                  <span className="text-[9px] text-text-secondary uppercase tracking-[0.2em] font-medium">Mid-audit interrupt</span>
+                  <span className="text-[9px] text-text-secondary uppercase tracking-[0.2em] font-medium">Mid-scan interrupt</span>
                 </div>
                 <input
                   type="checkbox"
@@ -262,7 +262,7 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
                 }}
                 className="flex items-center gap-2 text-[10px] font-mono font-bold text-text-muted hover:text-amber uppercase tracking-[0.25em] transition-colors"
               >
-                <LuArrowRight className="rotate-180" /> Back to claim
+                <LuArrowRight className="rotate-180" /> Back to brief
               </button>
             </div>
           </>
@@ -290,7 +290,7 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
             ) : (
               <div className="flex items-center justify-center gap-2.5">
                 <span className="mt-0.5 whitespace-nowrap">
-                  {showClarification ? "Start Verified Audit" : (enableClarification ? "Next Phase" : "Start Verified Audit")}
+                  {showClarification ? "Launch Scan" : (enableClarification ? "Next Phase" : "Launch Scan")}
                 </span>
                 { (showClarification || !enableClarification) ? (
                   <RiSparkling2Fill className="text-[17px] mb-0.5 text-white/90" />

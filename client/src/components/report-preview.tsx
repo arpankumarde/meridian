@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LuCheck, LuCopy, LuDownload, LuLoader, LuFileText } from "react-icons/lu";
+import { LuCheck, LuCopy, LuDownload, LuLoader, LuFileText, LuPrinter } from "react-icons/lu";
 import { Button } from "@/components/ui/button";
 
 interface ReportPreviewProps {
@@ -19,7 +19,6 @@ function slugify(text: string): string {
 
 export default function ReportPreview({ sessionId }: ReportPreviewProps) {
   const [report, setReport] = useState<string>("");
-  const [path, setPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -51,7 +50,6 @@ export default function ReportPreview({ sessionId }: ReportPreviewProps) {
 
         if (!cancelled) {
           setReport(data.report || "");
-          setPath(data.path || null);
           setEvidence(Array.isArray(evidenceData) ? evidenceData : evidenceData.findings || []);
         }
       } catch (err: unknown) {
@@ -271,13 +269,7 @@ ${htmlBody}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-obs-border">
           <div>
             <h3 className="text-lg font-display">Intelligence Report</h3>
-            <p className="text-xs text-text-muted mt-1">
-              {path ? (
-                <>Saved at: <span className="font-mono">{path}</span></>
-              ) : (
-                "Rendered from latest report"
-              )}
-            </p>
+            <p className="text-xs text-text-muted mt-1">Rendered from latest report</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {/* Format Toggles */}
@@ -298,6 +290,10 @@ ${htmlBody}
             <Button variant="ghost" size="sm" onClick={handleCopy} disabled={!report}>
               {copied ? <LuCheck /> : <LuCopy />}
               {copied ? "Copied" : "Copy"}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => window.print()} disabled={!report}>
+              <LuPrinter />
+              Print
             </Button>
             <Button size="sm" onClick={handleDownload} disabled={!report}>
               <LuDownload />

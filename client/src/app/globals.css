@@ -395,51 +395,51 @@
   }
 
   .badge-finding {
-    background: rgb(var(--emerald-soft));
-    color: rgb(var(--emerald));
-    border-color: rgb(var(--emerald) / 0.2);
+    background: rgb(var(--emerald));
+    color: #fff;
+    border-color: rgb(var(--emerald));
   }
 
   .badge-thinking {
-    background: rgb(var(--violet-soft));
-    color: rgb(var(--violet));
-    border-color: rgb(var(--violet) / 0.2);
+    background: rgb(var(--violet));
+    color: #fff;
+    border-color: rgb(var(--violet));
   }
 
   .badge-verify {
-    background: rgb(var(--gold-soft));
-    color: rgb(var(--gold));
-    border-color: rgb(var(--gold) / 0.2);
+    background: rgb(var(--gold));
+    color: #fff;
+    border-color: rgb(var(--gold));
   }
 
   .badge-warning {
-    background: rgb(var(--gold-soft));
-    color: rgb(var(--gold));
-    border-color: rgb(var(--gold) / 0.2);
+    background: rgb(var(--gold));
+    color: #fff;
+    border-color: rgb(var(--gold));
   }
 
   .badge-error {
-    background: rgb(var(--rose-soft));
-    color: rgb(var(--rose));
-    border-color: rgb(var(--rose) / 0.2);
+    background: rgb(var(--rose));
+    color: #fff;
+    border-color: rgb(var(--rose));
   }
 
   .badge-action {
-    background: rgb(var(--amber-soft));
-    color: rgb(var(--amber));
-    border-color: rgb(var(--amber) / 0.2);
+    background: rgb(var(--amber));
+    color: #fff;
+    border-color: rgb(var(--amber));
   }
 
   .badge-system {
-    background: rgb(var(--obs-border) / 0.3);
-    color: rgb(var(--text-muted));
-    border-color: rgb(var(--obs-border));
+    background: rgb(var(--text-muted));
+    color: #fff;
+    border-color: rgb(var(--text-muted));
   }
 
   .badge-success {
-    background: rgb(var(--emerald-soft));
-    color: rgb(var(--emerald));
-    border-color: rgb(var(--emerald) / 0.2);
+    background: rgb(var(--emerald));
+    color: #fff;
+    border-color: rgb(var(--emerald));
   }
 
   /* ── Status dots ── */

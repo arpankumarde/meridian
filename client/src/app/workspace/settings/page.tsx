@@ -33,16 +33,16 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-2">
                       <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-text-muted">First Name</p>
-                      <Input placeholder="Arpan" className="obs-input" />
+                      <Input placeholder="Enter your first name" className="obs-input" />
                    </div>
                    <div className="space-y-2">
                       <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-text-muted">Last Name</p>
-                      <Input placeholder="Kumar" className="obs-input" />
+                      <Input placeholder="Enter your last name" className="obs-input" />
                    </div>
                 </div>
                 <div className="space-y-2">
                    <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-text-muted">Public Display Name</p>
-                   <Input placeholder="Arpan Kumar" className="obs-input" />
+                   <Input placeholder="How your name appears to collaborators" className="obs-input" />
                 </div>
                 <div className="space-y-2 text-right pt-4">
                   <Button className="bg-amber hover:bg-amber-hover text-white px-8 font-bold text-[13px] uppercase tracking-widest">Update Profile</Button>

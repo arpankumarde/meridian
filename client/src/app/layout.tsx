@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Meridian - Enterprise R&D Intelligence",
   description:
     "Connect your internal R&D corpus to papers, patents, standards, and filings. Confidence-scored landscapes with full citation trails.",
+  icons: "/brand/logo.png",
 };
 
 export default function RootLayout({

@@ -1,10 +1,26 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { LuMail, LuShield, LuEllipsisVertical, LuPlus, LuLoader, LuUser } from "react-icons/lu";
+import { LuMail, LuEllipsisVertical, LuPlus, LuLoader, LuUser, LuTrash2 } from "react-icons/lu";
 import { Button } from "@/components/ui/button";
 import InviteModal from "@/components/team/invite-modal";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Member {
   id: string;
@@ -13,11 +29,15 @@ interface Member {
   createdAt: string;
 }
 
+const MAX_MEMBERS = 5;
+
 export default function TeamPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Member | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchMembers = useCallback(async (id: string) => {
     try {
@@ -64,19 +84,55 @@ export default function TeamPage() {
     return member.email.substring(0, 2).toUpperCase();
   };
 
+  const atCapacity = members.length >= MAX_MEMBERS;
+
+  const handleInviteClick = () => {
+    if (atCapacity) {
+      toast.error(`Maximum of ${MAX_MEMBERS} members allowed per workspace.`);
+      return;
+    }
+    setShowInviteModal(true);
+  };
+
+  const handleDelete = async () => {
+    if (!pendingDelete || !orgId) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/organizations/${orgId}/members/${pendingDelete.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to remove member");
+
+      toast.success("Member removed");
+      setPendingDelete(null);
+      fetchMembers(orgId);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-7xl mx-auto px-6 py-12 animate-rise">
       <div className="flex justify-between items-center mb-12">
         <div>
           <h2 className="text-3xl font-display font-semibold mb-2">Team Management</h2>
-          <p className="text-text-secondary text-sm">Invite and manage collaborators in your workspace.</p>
+          <p className="text-text-secondary text-sm">
+            Invite and manage collaborators in your workspace.{" "}
+            <span className="font-mono text-[11px] text-text-muted">
+              {members.length}/{MAX_MEMBERS} members
+            </span>
+          </p>
         </div>
-        <Button 
-          onClick={() => setShowInviteModal(true)} 
-          className="gap-2 bg-amber hover:bg-amber-hover text-white shadow-sm font-bold uppercase tracking-widest text-[11px] h-11 px-6"
+        <Button
+          onClick={handleInviteClick}
+          disabled={atCapacity}
+          className="gap-2 bg-amber hover:bg-amber-hover text-white shadow-sm font-bold uppercase tracking-widest text-[11px] h-11 px-6 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <LuPlus className="text-lg" />
-          Invite Member
+          {atCapacity ? "Limit Reached" : "Invite Member"}
         </Button>
       </div>
 
@@ -95,9 +151,9 @@ export default function TeamPage() {
             <p className="text-sm text-text-secondary max-w-xs mx-auto mb-8">
               Start building your research group by inviting collaborators to this organization.
             </p>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowInviteModal(true)}
+            <Button
+              variant="outline"
+              onClick={handleInviteClick}
               className="font-bold uppercase tracking-widest text-[10px] border-obs-border"
             >
               Add First Member
@@ -119,9 +175,6 @@ export default function TeamPage() {
                       <span className="flex items-center gap-1.5 text-[11px] text-text-secondary font-mono">
                         <LuMail className="text-[12px] opacity-60" /> {member.email}
                       </span>
-                      <span className="flex items-center gap-1.5 text-[11px] text-text-secondary font-mono border-l border-obs-border pl-3">
-                        <LuShield className="text-[12px] text-amber opacity-80" /> Member
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -129,9 +182,22 @@ export default function TeamPage() {
                    <div className="hidden md:block px-2.5 py-0.5 rounded-full bg-emerald/5 border border-emerald/20 text-[9px] font-mono font-bold text-emerald uppercase tracking-tighter">
                       Active
                    </div>
-                   <Button variant="ghost" size="icon" className="text-text-muted hover:text-text rounded-full hover:bg-white border border-transparent hover:border-obs-border transition-all">
-                    <LuEllipsisVertical />
-                  </Button>
+                   <DropdownMenu>
+                     <DropdownMenuTrigger asChild>
+                       <Button variant="ghost" size="icon" className="text-text-muted hover:text-text rounded-full hover:bg-white border border-transparent hover:border-obs-border transition-all">
+                        <LuEllipsisVertical />
+                      </Button>
+                     </DropdownMenuTrigger>
+                     <DropdownMenuContent align="end" className="w-44">
+                       <DropdownMenuItem
+                         onClick={() => setPendingDelete(member)}
+                         className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer gap-2"
+                       >
+                         <LuTrash2 className="text-sm" />
+                         Remove member
+                       </DropdownMenuItem>
+                     </DropdownMenuContent>
+                   </DropdownMenu>
                 </div>
               </div>
             ))}
@@ -140,12 +206,38 @@ export default function TeamPage() {
       </div>
 
       {showInviteModal && (
-        <InviteModal 
-          orgId={orgId} 
-          onClose={() => setShowInviteModal(false)} 
-          onSuccess={() => orgId && fetchMembers(orgId)} 
+        <InviteModal
+          orgId={orgId}
+          onClose={() => setShowInviteModal(false)}
+          onSuccess={() => orgId && fetchMembers(orgId)}
         />
       )}
+
+      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => !open && !deleting && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove team member?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete
+                ? `This will permanently remove ${getDisplayName(pendingDelete)} (${pendingDelete.email}) from your workspace. This action cannot be undone.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleting ? "Removing..." : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -37,7 +37,6 @@ const tabs = [
   { id: "report", label: "Intelligence Report", icon: LuFileText },
   { id: "graph", label: "Knowledge Graph", icon: LuNetwork },
   { id: "sources", label: "Sources", icon: LuCompass },
-  { id: "agents", label: "Agents", icon: LuBrain },
 ] as const;
 
 type TabId = (typeof tabs)[number]["id"];
@@ -470,16 +469,6 @@ console.log("ab: ", session)
         )}
 
         {activeTab === "sources" && <SourcesBrowser sessionId={sessionId} />}
-
-        {activeTab === "agents" && (
-          <SubPagePlaceholder
-            icon={LuBrain}
-            title="Agent Transparency"
-            description="Explore the decision audit trail -- see how each agent reasoned, what actions they took, and how they collaborated."
-            linkHref={`/check/${sessionId}/agents`}
-            linkText="Open Agent View"
-          />
-        )}
 
       </main>
 
