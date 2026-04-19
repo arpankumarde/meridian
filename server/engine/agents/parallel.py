@@ -278,7 +278,7 @@ class ParallelInternPool:
             VerificationDirective(
                 action="search",
                 topic=aspect,
-                instructions=f"Search for evidence related to this verification angle: {aspect}",
+                instructions=f"Gather corroborating, contradicting, and extending evidence for this research angle. Prefer primary sources (papers, patents, filings, lab research blogs). Angle: {aspect}",
                 priority=8,
                 max_searches=5,
             )
@@ -308,13 +308,19 @@ class ParallelInternPool:
         import re
 
         prompt = (
-            f"Decompose this claim into {max_aspects} "
-            "distinct verification angles that can be investigated independently "
+            f"Decompose this research brief into {max_aspects} "
+            "distinct research angles that can be investigated independently "
             "and in parallel.\n\n"
-            f"Claim: {claim}\n\n"
-            "Each angle should be specific, focused, cover a "
-            "different aspect of the claim, and be searchable standalone. "
-            "Include angles that could both support AND contradict the claim."
+            f"Brief: {claim}\n\n"
+            "Each angle should be specific, focused, cover a different facet of "
+            "the brief, and be searchable standalone. Include angles that "
+            "would surface CORROBORATING evidence, CONTRADICTING evidence "
+            "(replications that failed, rebuttals, limitations), and "
+            "EXTENDING evidence (adjacent work, follow-on studies, related "
+            "approaches). When a facet maps cleanly to a corpus (academic, "
+            "patents, standards, regulatory, internal R&D docs, industry AI/ML "
+            "research blogs), word the angle so the search tool routing can "
+            "pick it up."
         )
 
         decompose_schema = {

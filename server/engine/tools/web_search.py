@@ -75,6 +75,95 @@ def _strip_html(html: str) -> str:
     return p.get_text()
 
 
+# ---------------------------------------------------------------------------
+# Source quality lists — drives soft ranking of search results.
+# These are *advisory*: a low score deprioritizes a result during deep-scrape
+# selection but never hard-filters it. A legitimately important source on a
+# blocked domain (rare) still flows through to the LLM.
+# ---------------------------------------------------------------------------
+
+# Tier 1 — primary R&D sources. Substring match against URL host.
+CREDIBLE_DOMAINS: frozenset[str] = frozenset({
+    # --- Academic / preprints ---
+    "arxiv.org", "semanticscholar.org", "scholar.google.com",
+    "openreview.net", "aclanthology.org", "acm.org", "ieee.org",
+    "ieeexplore.ieee.org", "springer.com", "link.springer.com",
+    "sciencedirect.com", "cell.com", "nature.com", "science.org",
+    "pnas.org", "jstor.org", "biorxiv.org", "medrxiv.org", "ssrn.com",
+    "wiley.com", "tandfonline.com", "mdpi.com", "frontiersin.org",
+    # --- Medical / health / life sciences ---
+    "pubmed.ncbi.nlm.nih.gov", "ncbi.nlm.nih.gov", "nih.gov",
+    "nejm.org", "thelancet.com", "bmj.com", "jamanetwork.com",
+    "who.int", "cdc.gov", "cochranelibrary.com", "clinicaltrials.gov",
+    # --- AI / ML labs and engineering blogs ---
+    "openai.com", "anthropic.com", "deepmind.google", "deepmind.com",
+    "ai.meta.com", "ai.googleblog.com", "research.google",
+    "research.microsoft.com", "blogs.microsoft.com",
+    "qwenlm.github.io", "huggingface.co", "mistral.ai", "cohere.com",
+    "stability.ai", "x.ai", "together.ai", "databricks.com",
+    "nvidia.com", "apple.com", "amazon.science", "allenai.org",
+    # --- Standards / engineering bodies ---
+    "iso.org", "iec.ch", "ietf.org", "w3.org", "nist.gov",
+    "ansi.org", "astm.org", "etsi.org", "3gpp.org",
+    # --- Patents / IP ---
+    "patents.uspto.gov", "patentsview.org", "patents.google.com",
+    "worldwide.espacenet.com", "wipo.int", "epo.org",
+    # --- Regulatory / filings ---
+    "sec.gov", "fda.gov", "ema.europa.eu", "federalregister.gov",
+    "eur-lex.europa.eu", "ecfr.gov", "fcc.gov", "openfda.gov",
+    # --- Reputable news (secondary) ---
+    "reuters.com", "ap.org", "bbc.com", "ft.com", "wsj.com",
+    "bloomberg.com", "economist.com", "nytimes.com", "washingtonpost.com",
+    # --- Trusted technical engineering blogs ---
+    "engineering.fb.com", "netflixtechblog.com", "eng.uber.com",
+    "stripe.com", "github.blog", "blog.cloudflare.com",
+    "aws.amazon.com", "cloud.google.com",
+})
+
+# Tier 3 — social and UGC sites. Reddit is excluded here because the platform
+# scraper extracts useful signal from it; raw social feeds are not source
+# material for an R&D landscape.
+LOW_QUALITY_DOMAINS: frozenset[str] = frozenset({
+    "facebook.com", "instagram.com", "tiktok.com",
+    "pinterest.com", "snapchat.com",
+    "quora.com", "answers.yahoo.com", "ehow.com", "wikihow.com",
+})
+
+# Mid-tier — orientation only, never primary evidence.
+MID_TIER_DOMAINS: frozenset[str] = frozenset({
+    "wikipedia.org", "stackoverflow.com",
+})
+
+
+def _score_source_quality(url: str) -> float:
+    """Return a soft quality score in [0, 1] for a URL.
+
+    Used to bias which results the intern deep-scrapes first. Never hard-filters.
+
+      1.0 — Tier 1 credible R&D source
+      0.5 — Mid-tier (Wikipedia, StackOverflow) — orientation only
+      0.2 — Tier 3 (social, UGC Q&A) — deprioritize
+      0.7 — Unknown domain (default — neither boosted nor penalized)
+    """
+    if not url:
+        return 0.7
+    try:
+        from urllib.parse import urlparse
+        host = urlparse(url).netloc.lower().lstrip("www.")
+    except Exception:
+        return 0.7
+    if not host:
+        return 0.7
+    # Suffix-match so subdomains of credible orgs (e.g. research.google) hit.
+    if any(host == d or host.endswith("." + d) or d in host for d in CREDIBLE_DOMAINS):
+        return 1.0
+    if any(host == d or host.endswith("." + d) for d in LOW_QUALITY_DOMAINS):
+        return 0.2
+    if any(host == d or host.endswith("." + d) for d in MID_TIER_DOMAINS):
+        return 0.5
+    return 0.7
+
+
 class WebSearchTool:
     """Web search and scraping via Bright Data.
 
