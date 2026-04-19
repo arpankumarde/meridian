@@ -32,13 +32,19 @@ export default function LandingNav() {
             >
               Architecture
             </Link>
+            <Link
+              href="#pricing"
+              className="hover:text-amber transition-colors"
+            >
+              Pricing
+            </Link>
           </div>
 
           <Button
             asChild
             className="rounded-lg px-6 py-2 text-[13px] tracking-wide bg-amber hover:bg-amber-hover shadow-none"
           >
-            <Link href="/dashboard">
+            <Link href="/workspace">
               Workspace <LuArrowRight className="text-sm" />
             </Link>
           </Button>

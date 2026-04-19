@@ -72,7 +72,7 @@ export default function LandingHero() {
 
             <div className="flex flex-col sm:flex-row items-center gap-5 animate-rise opacity-0 [animation-delay:240ms]">
               <Button
-                onClick={() => router.push("/dashboard")}
+                onClick={() => router.push("/login")}
                 size="lg"
                 className="group px-10 h-14 text-sm font-bold uppercase tracking-[0.2em]"
               >

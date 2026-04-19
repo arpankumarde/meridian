@@ -3,6 +3,7 @@
 import LandingNav from "@/components/landing/nav";
 import LandingHero from "@/components/landing/hero";
 import LandingProcess from "@/components/landing/process";
+import LandingPricing from "@/components/landing/pricing";
 import LandingFooter from "@/components/landing/footer";
 import { LuBookOpen, LuGlobe, LuScale, LuFolderGit2 } from "react-icons/lu";
 import { Button } from "@/components/ui/button";
@@ -163,6 +164,8 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <LandingPricing />
+
         {/* CTA Section */}
         <section className="py-32 px-6 flex flex-col items-center text-center max-w-7xl mx-auto">
           <div className="max-w-2xl stagger-children flex flex-col items-center">
@@ -178,7 +181,7 @@ export default function LandingPage() {
               size="lg"
               className="px-12 h-14 text-[15px] font-bold uppercase tracking-widest"
             >
-              <Link href="/dashboard">Launch Workspace</Link>
+              <Link href="/login">Launch Workspace</Link>
             </Button>
           </div>
         </section>

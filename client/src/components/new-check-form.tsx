@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MdClose, MdAutorenew, MdSettingsSuggest, MdPsychologyAlt, MdPolicy } from "react-icons/md";
+import { 
+  LuX, 
+  LuRefreshCw, 
+  LuArrowRight,
+} from "react-icons/lu";
+import { RiSparkling2Fill } from "react-icons/ri";
 
 interface NewCheckFormProps {
   onClose: () => void;
@@ -137,13 +142,13 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
 
   return (
     <div className="bg-white border border-obs-border rounded-lg overflow-hidden relative shadow-2xl">
-      <form onSubmit={handleSubmit} className="p-8 md:p-10 space-y-10">
+      <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-7">
         {/* Header */}
-        <div className="space-y-2 border-b border-obs-border pb-6">
-          <h2 className="text-xl md:text-2xl font-display font-semibold tracking-tight text-text uppercase">
+        <div className="space-y-1.5 border-b border-obs-border pb-5">
+          <h2 className="text-xl md:text-2xl font-display font-semibold tracking-tight text-text uppercase text-center md:text-left">
             {showClarification ? "Audit Refinement" : "Initialize Audit"}
           </h2>
-          <p className="text-[12px] font-mono text-text-secondary uppercase tracking-widest opacity-60">
+          <p className="text-[11px] font-mono text-text-secondary uppercase tracking-[0.2em] opacity-60 text-center md:text-left">
             {showClarification
               ? "Refining verification scope via AI inquiry"
               : "Configuring multi-agent verification parameters"}
@@ -154,35 +159,37 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-8 right-8 text-text-muted hover:text-amber transition-colors"
+          className="absolute top-6 right-6 p-1.5 rounded-full text-text-muted hover:text-amber hover:bg-surface transition-all"
         >
-          <MdClose className="text-xl" />
+          <LuX className="text-xl" />
         </button>
 
         {!showClarification ? (
           <>
             {/* Claim Input */}
-            <div className="space-y-3">
-              <label className="text-[10px] font-mono font-bold text-text-muted uppercase tracking-[0.2em]">
+            <div className="space-y-2.5">
+              <label className="text-[10px] font-mono font-bold text-text-muted uppercase tracking-[0.3em]">
                 Target Claim
               </label>
               <textarea
                 value={claim}
                 onChange={(e) => setClaim(e.target.value)}
-                className="w-full min-h-[120px] bg-surface border border-obs-border text-base p-5 rounded-lg focus:outline-none focus:border-amber transition-colors text-text placeholder:text-text-muted/50"
+                className="w-full min-h-[100px] bg-surface border border-obs-border text-sm p-4 rounded-xl focus:outline-none focus:border-amber transition-colors text-text placeholder:text-text-muted/50 shadow-inner"
                 placeholder='e.g., "Company X reported record Q3 profits despite supply chain disruption"'
               />
             </div>
 
             {/* Iterations */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-[10px] font-mono font-bold text-text-muted uppercase tracking-[0.2em]">
-                  Audit Depth
+                <label className="text-[10px] font-mono font-bold text-text-muted uppercase tracking-[0.3em]">
+                  Audit Depth <span className="text-cyan ml-2 opacity-80">[{depthLabel} Assessment]</span>
                 </label>
-                <span className="text-amber font-mono text-[11px] font-bold">
-                  {maxIterations} ITERATIONS
-                </span>
+                <div className="bg-amber-soft px-3 py-0.5 rounded-full border border-amber/10">
+                  <span className="text-amber font-mono text-[10px] font-bold tracking-widest">
+                    {maxIterations} ITERATIONS
+                  </span>
+                </div>
               </div>
               <input
                 type="range"
@@ -193,36 +200,36 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
                 onChange={(e) => setMaxIterations(parseInt(e.target.value))}
                 className="w-full h-1 bg-obs-border rounded-full appearance-none cursor-pointer accent-amber"
               />
-               <div className="flex justify-between text-[10px] text-text-muted font-mono uppercase tracking-widest">
+               <div className="flex justify-between text-[9px] text-text-muted font-mono uppercase tracking-[0.25em] font-medium">
                 <span>Quick Scan</span>
                 <span>Exhaustive</span>
               </div>
             </div>
 
             {/* Toggles */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center justify-between p-4 bg-surface border border-obs-border rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="flex items-center justify-between p-4 bg-surface border border-obs-border rounded-xl transition-all hover:bg-white hover:shadow-md cursor-pointer group">
                 <div className="flex flex-col">
-                  <span className="text-[11px] font-bold text-text uppercase tracking-wider">Clarification</span>
-                  <span className="text-[9px] text-text-secondary uppercase tracking-widest">Pre-audit check</span>
+                  <span className="text-[11px] font-bold text-text uppercase tracking-widest mb-0.5">Clarification</span>
+                  <span className="text-[9px] text-text-secondary uppercase tracking-[0.2em] font-medium">Pre-audit check</span>
                 </div>
                 <input
                   type="checkbox"
                   checked={enableClarification}
                   onChange={(e) => setEnableClarification(e.target.checked)}
-                  className="w-4 h-4 accent-amber"
+                  className="w-5 h-5 accent-amber rounded border-obs-border"
                 />
               </div>
-              <div className="flex items-center justify-between p-4 bg-surface border border-obs-border rounded-lg">
+              <div className="flex items-center justify-between p-4 bg-surface border border-obs-border rounded-xl transition-all hover:bg-white hover:shadow-md cursor-pointer group">
                 <div className="flex flex-col">
-                  <span className="text-[11px] font-bold text-text uppercase tracking-wider">Human in loop</span>
-                  <span className="text-[9px] text-text-secondary uppercase tracking-widest">Mid-audit interrupt</span>
+                  <span className="text-[11px] font-bold text-text uppercase tracking-widest mb-0.5">Human in loop</span>
+                  <span className="text-[9px] text-text-secondary uppercase tracking-[0.2em] font-medium">Mid-audit interrupt</span>
                 </div>
                 <input
                   type="checkbox"
                   checked={enableMidQuestions}
                   onChange={(e) => setEnableMidQuestions(e.target.checked)}
-                  className="w-4 h-4 accent-amber"
+                  className="w-5 h-5 accent-amber rounded border-obs-border"
                 />
               </div>
             </div>
@@ -230,17 +237,17 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
         ) : (
           <>
             {/* Clarification Questions */}
-            <div className="space-y-8 bg-surface p-6 rounded-lg border border-obs-border">
+            <div className="space-y-6 bg-surface p-6 rounded-xl border border-obs-border">
               {questions.map((q, idx) => (
-                <div key={idx} className="space-y-3">
+                <div key={idx} className="space-y-2">
                   <label className="block text-sm font-semibold text-text">
-                    <span className="text-amber mr-2">{idx + 1}.</span> {q.question}
+                    <span className="text-amber mr-2 font-mono">{idx + 1}.</span> {q.question}
                   </label>
                   <input
                     type="text"
                     value={answers[idx.toString()] || ""}
                     onChange={(e) => setAnswers({ ...answers, [idx.toString()]: e.target.value })}
-                    className="w-full bg-white border border-obs-border p-3 text-sm rounded focus:outline-none focus:border-amber transition-colors"
+                    className="w-full bg-white border border-obs-border p-3.5 text-sm rounded-lg focus:outline-none focus:border-amber transition-colors shadow-sm"
                     placeholder="Enter analytical response..."
                   />
                 </div>
@@ -253,9 +260,9 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
                   setQuestions([]);
                   setAnswers({});
                 }}
-                className="text-[10px] font-mono font-bold text-text-muted hover:text-amber uppercase tracking-[0.2em] transition-colors"
+                className="flex items-center gap-2 text-[10px] font-mono font-bold text-text-muted hover:text-amber uppercase tracking-[0.25em] transition-colors"
               >
-                &larr; Back to claim
+                <LuArrowRight className="rotate-180" /> Back to claim
               </button>
             </div>
           </>
@@ -263,40 +270,36 @@ export default function NewCheckForm({ onClose, onSuccess }: NewCheckFormProps) 
 
         {/* Error */}
         {error && (
-          <div className="text-[11px] font-mono text-rose bg-rose-soft border border-rose/20 rounded-lg px-4 py-3 uppercase tracking-widest font-bold">
-            [Error]: {error}
+          <div className="text-[11px] font-mono text-rose bg-rose-soft border border-rose/20 rounded-xl px-4 py-3 uppercase tracking-[0.2em] font-bold">
+            [ERR]: {error}
           </div>
         )}
 
         {/* Action Button */}
-        <div className="pt-4">
+        <div className="pt-0">
           <button
             type="submit"
             disabled={loading || !claim.trim() || (showClarification && Object.keys(answers).length === 0)}
-            className="w-full py-4 px-6 bg-amber hover:bg-amber-hover text-white font-bold text-[13px] rounded-lg transition-all duration-300 uppercase tracking-[0.2em] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed shadow-none"
+            className="w-full py-5 px-6 bg-amber hover:bg-amber-hover text-white font-bold text-[12px] rounded-xl transition-all duration-300 uppercase tracking-[0.3em] flex items-center justify-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-amber/10 active:scale-[0.98]"
           >
             {loading ? (
-              <>
-                <MdAutorenew className="animate-spin text-sm" />
-                {showClarification ? "Processing..." : "Analyzing..."}
-              </>
+              <div className="flex items-center justify-center gap-2">
+                <span className="mt-0.5">{showClarification ? "Processing" : "Analyzing"}</span>
+                <LuRefreshCw className="animate-spin text-lg" />
+              </div>
             ) : (
-              <>
-                {showClarification ? (
-                  <MdSettingsSuggest className="text-[16px]" />
-                ) : enableClarification ? (
-                  <MdPsychologyAlt className="text-[16px]" />
+              <div className="flex items-center justify-center gap-2.5">
+                <span className="mt-0.5 whitespace-nowrap">
+                  {showClarification ? "Start Verified Audit" : (enableClarification ? "Next Phase" : "Start Verified Audit")}
+                </span>
+                { (showClarification || !enableClarification) ? (
+                  <RiSparkling2Fill className="text-[17px] mb-0.5 text-white/90" />
                 ) : (
-                  <MdPolicy className="text-[16px]" />
+                  <LuArrowRight className="text-lg" />
                 )}
-                {showClarification ? "Start Verified Audit" : (enableClarification ? "Next Phase" : "Start Verified Audit")}
-              </>
+              </div>
             )}
           </button>
-          
-          <div className="mt-6 flex justify-center text-[10px] font-mono text-text-muted uppercase tracking-[0.2em]">
-            Mode: <span className="text-text font-bold ml-2">{depthLabel} Assessment</span>
-          </div>
         </div>
       </form>
     </div>

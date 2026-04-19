@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
 
@@ -10,7 +10,8 @@ datasource db {
 model Organization {
   id            String         @id @default(uuid())
   name          String
-  domain        String         @unique
+  description   String?
+  domain        String?
   logo          String?
   users         User[]
   subscriptions Subscription[]
@@ -22,6 +23,7 @@ model Organization {
 
 model User {
   id             String        @id @default(uuid())
+  name           String?
   email          String        @unique
   password       String
   emailVerified  Boolean       @default(false)

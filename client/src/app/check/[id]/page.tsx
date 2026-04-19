@@ -197,10 +197,14 @@ console.log("ab: ", session)
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <LuLoader className="text-4xl text-amber animate-spin mb-4 block" />
-          <p className="text-text-secondary">Loading session...</p>
+      <div className="min-h-screen flex items-center justify-center bg-void flex-col p-6">
+        <div className="relative w-16 h-16 flex items-center justify-center mb-6">
+          <div className="absolute inset-0 rounded-2xl bg-amber/5 animate-pulse" />
+          <LuLoader className="text-3xl text-amber animate-spin relative z-10" />
+        </div>
+        <div className="text-center space-y-2">
+          <h2 className="text-sm font-mono font-bold text-amber uppercase tracking-[0.3em]">Initializing Agent</h2>
+          <p className="text-[11px] text-text-secondary uppercase tracking-[0.2em]">Synchronizing research workspace...</p>
         </div>
       </div>
     );
@@ -208,11 +212,23 @@ console.log("ab: ", session)
 
   if (error || !session) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <LuCircleAlert className="text-5xl text-rose mb-4 block" />
-          <h2 className="text-2xl font-display mb-2">{error || "Session not found"}</h2>
-          <Link href="/" className="text-amber hover:underline text-sm">&larr; Back to Dashboard</Link>
+      <div className="min-h-screen flex items-center justify-center bg-void p-6">
+        <div className="max-w-md w-full bg-white border border-obs-border rounded-2xl p-10 shadow-2xl text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-rose-soft border border-rose/10 flex items-center justify-center mx-auto mb-2">
+            <LuCircleAlert className="text-3xl text-rose" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-display font-semibold tracking-tight">{error || "Session not found"}</h2>
+            <p className="text-sm text-text-secondary">The intelligence session you are looking for might have been expired, archived, or is currently unreachable.</p>
+          </div>
+          <div className="pt-4">
+            <Button asChild variant="default" className="w-full h-12 font-bold uppercase tracking-widest text-[11px]">
+              <Link href="/workspace">
+                <LuArrowLeft className="mr-2" />
+                Return to Workspace
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -245,7 +261,7 @@ console.log("ab: ", session)
 
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-4 min-w-0">
-              <Link href="/dashboard" className="text-text-secondary hover:text-amber transition-colors mt-1 shrink-0">
+              <Link href="/workspace" className="text-text-secondary hover:text-amber transition-colors mt-1 shrink-0">
                 <LuArrowLeft />
               </Link>
               <div className="min-w-0">

@@ -43,7 +43,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ ok: true, userId });
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { organizationId: true },
+    });
+
+    return NextResponse.json({ ok: true, userId, organizationId: user?.organizationId });
   } catch (err) {
     console.error("[auth/verify-otp] error", err);
     return NextResponse.json(

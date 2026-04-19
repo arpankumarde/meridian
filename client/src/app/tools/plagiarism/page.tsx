@@ -104,7 +104,7 @@ export default function PlagiarismCheckerPage() {
       <header className="border-b border-obs-border bg-white/80 backdrop-blur-md sticky top-0 z-20">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-text-secondary hover:text-amber transition-colors">
+            <Link href="/workspace" className="text-text-secondary hover:text-amber transition-colors">
               <LuArrowLeft className="text-xl" />
             </Link>
             <div className="flex items-center gap-2.5">

@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import NewCheckForm from "@/components/new-check-form";
 import Link from "next/link";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   LuPlus,
   LuArrowUpRight,
@@ -30,6 +33,7 @@ export default function DashboardPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewCheck, setShowNewCheck] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const fetchSessions = async () => {
     try {
@@ -47,38 +51,24 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchSessions();
+    if (!localStorage.getItem("meridian_onboarding_domain")) {
+      setTimeout(() => setShowOnboarding(true), 300);
+    }
   }, []);
+
+  const handleOnboardingComplete = async (domain: string) => {
+    localStorage.setItem("meridian_onboarding_domain", domain);
+    setShowOnboarding(false);
+    toast.success(`Workspace tailored for ${domain}`);
+    // This value mimics the orgDomain payload dropped during signup
+  };
 
   const activeStatuses = ["running", "pending", "paused", "crashed"];
   const activeSessions = sessions.filter((s) => activeStatuses.includes(s.status));
   const completedSessions = sessions.filter((s) => !activeStatuses.includes(s.status));
 
   return (
-    <div className="min-h-screen bg-white flex flex-col text-text font-sans">
-      {/* Dashboard Header */}
-      <header className="border-b border-obs-border bg-white/80 backdrop-blur-md sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <img src="/brand/logo.png" alt="Meridian" className="h-9 w-auto" />
-            <div>
-              <h1 className="text-lg font-display font-semibold tracking-tight text-text">Meridian</h1>
-              <p className="text-[9px] text-text-muted font-mono uppercase tracking-widest leading-none">R&amp;D Workspace</p>
-            </div>
-          </Link>
-
-          <div className="flex items-center gap-4">
-            <Button
-              onClick={() => setShowNewCheck(true)}
-              size="lg"
-              className="px-5 text-[13px] font-bold uppercase tracking-wider"
-            >
-              <LuPlus />
-              New Scan
-            </Button>
-          </div>
-        </div>
-      </header>
-
+    <div className="w-full flex-1 flex flex-col font-sans">
       {/* Main Dashboard UI */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-12">
         <div className="flex flex-col md:flex-row justify-between items-baseline mb-12 gap-6">
@@ -87,11 +77,19 @@ export default function DashboardPage() {
              <p className="text-text-secondary text-sm">Workspace status: <span className="text-emerald font-bold uppercase tracking-widest text-[10px]">Operational</span></p>
            </div>
 
-           <div className="flex gap-4 items-center">
+            <div className="flex flex-wrap gap-4 items-center">
               <div className="px-4 py-2 bg-surface border border-obs-border rounded-lg text-[11px] font-mono font-bold uppercase tracking-widest text-text-muted">
                  Session: {Math.random().toString(16).slice(2, 8).toUpperCase()}
               </div>
-           </div>
+              <Button
+                onClick={() => setShowNewCheck(true)}
+                size="default"
+                className="px-5 text-[12px] font-bold uppercase tracking-wider"
+              >
+                <LuPlus />
+                New Scan
+              </Button>
+            </div>
         </div>
 
         {/* Stats Grid */}
@@ -218,18 +216,89 @@ export default function DashboardPage() {
 
       {/* New Check Modal */}
       {showNewCheck && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-sm p-4 md:p-12 overflow-y-auto">
-          <div className="w-full max-w-[640px] animate-scale-up shadow-2xl rounded-lg my-auto">
-            <NewCheckForm
-              onClose={() => setShowNewCheck(false)}
-              onSuccess={() => {
-                setShowNewCheck(false);
-                fetchSessions();
-              }}
-            />
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/60 backdrop-blur-md">
+          <div className="flex min-h-full items-center justify-center p-4 md:p-12">
+            <div className="w-full max-w-[640px] animate-scale-up shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] rounded-2xl bg-white overflow-hidden">
+              <NewCheckForm
+                onClose={() => setShowNewCheck(false)}
+                onSuccess={() => {
+                  setShowNewCheck(false);
+                  fetchSessions();
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
+
+      {showOnboarding && <DomainOnboardingModal onClose={handleOnboardingComplete} />}
+    </div>
+  );
+}
+
+function DomainOnboardingModal({ onClose }: { onClose: (domain: string) => void }) {
+  const [selected, setSelected] = useState<string>("");
+  const [custom, setCustom] = useState("");
+
+  const domains = ["Deep Tech", "Biology & Medical", "Software & AI", "Materials Science", "Custom"];
+
+  const handleSave = () => {
+    const finalDomain = selected === "Custom" ? custom : selected;
+    if (finalDomain.trim()) {
+      onClose(finalDomain);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md bg-white border border-obs-border rounded-xl shadow-2xl p-8 animate-rise relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber to-cyan" />
+        
+        <h2 className="font-display text-2xl font-bold text-text mb-2 tracking-tight">Configure Workspace</h2>
+        <p className="font-sub text-[15px] text-text-secondary mb-6">
+          To tailor your landscape scans, please specify your organization's primary domain of research.
+        </p>
+
+        <div className="space-y-3 mb-6">
+          {domains.map(d => (
+            <button
+              key={d}
+              onClick={() => setSelected(d)}
+              className={`w-full text-left px-4 py-3 rounded-lg border text-[14px] font-semibold transition-all ${
+                selected === d 
+                  ? 'border-amber bg-amber/5 text-amber ring-1 ring-amber shadow-[0_0_15px_-3px_rgba(255,166,0,0.15)]' 
+                  : 'border-obs-border hover:border-obs-border/80 hover:bg-surface text-text'
+              }`}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+
+        {selected === "Custom" && (
+          <div className="mb-6 animate-scale-up">
+            <Label htmlFor="customDomain" className="font-sans text-xs uppercase tracking-widest text-text-secondary mb-2 block">
+              Specify Domain
+            </Label>
+            <Input 
+              id="customDomain" 
+              placeholder="e.g. Quantum Computing" 
+              value={custom} 
+              onChange={e => setCustom(e.target.value)}
+              className="h-12 obs-input text-[15px]"
+            />
+          </div>
+        )}
+
+        <Button 
+          onClick={handleSave} 
+          disabled={!selected || (selected === "Custom" && !custom.trim())}
+          className="h-12 w-full bg-text hover:bg-black text-white font-bold uppercase tracking-widest text-[13px] transition-colors relative overflow-hidden group"
+        >
+          <span className="relative z-10 transition-transform group-hover:translate-x-1 inline-block">Initialize Workspace</span>
+          <span className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+        </Button>
+      </div>
     </div>
   );
 }
